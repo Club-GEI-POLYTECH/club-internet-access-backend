@@ -1,24 +1,15 @@
-# Configuration Railway pour Club Internet Access
-# NOTE: Ce fichier est pour référence. Vous DEVEZ configurer le Root Directory dans Railway Dashboard.
-# IMPORTANT: Utilisez DOCKERFILE, pas NIXPACKS
+# Configuration Railway pour Club Internet Access Backend
+# Railway utilise principalement railway.json et docker-compose.prod.yml
+# Ce fichier est optionnel et peut être utilisé pour des configurations supplémentaires
 
 [build]
 builder = "DOCKERFILE"
+dockerfile = "Dockerfile"
 
-# Configuration pour le service backend
-# Le Root Directory doit être configuré dans Railway Dashboard: "backend"
-[services.backend]
-build = { root = "./backend" }
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
 
-[services.backend.variables]
+[env]
 NODE_ENV = "production"
 PORT = "4000"
-
-# Configuration pour le service frontend
-# Le Root Directory doit être configuré dans Railway Dashboard: "frontend"
-[services.frontend]
-build = { root = "./frontend" }
-
-[services.frontend.variables]
-NODE_ENV = "production"
-PORT = "80"
