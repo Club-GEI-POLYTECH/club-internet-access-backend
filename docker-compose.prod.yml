@@ -1,10 +1,32 @@
 # Docker Compose pour la PRODUCTION
-# NOTE: PostgreSQL est fourni par Railway comme service séparé
-# Ce fichier est pour déploiement local en production (sans Railway)
+# Pour Railway, PostgreSQL est fourni comme service séparé
+# Ce fichier peut être utilisé pour déploiement local en production
 
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: internet-access-postgres-prod
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-unikin_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-unikin_password}
+      POSTGRES_DB: ${DB_DATABASE:-internet_access}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-unikin_user} -d ${DB_DATABASE:-internet_access}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internet-access-network-prod
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -15,12 +37,12 @@ services:
     environment:
       NODE_ENV: production
       # Pour Railway, utilisez les variables ${{Postgres.PGHOST}}, etc.
-      # Pour déploiement local, configurez ces variables dans .env
-      DB_HOST: ${DB_HOST}
+      # Pour déploiement local, utilisez les variables ci-dessous
+      DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME:-unikin_user}
+      DB_PASSWORD: ${DB_PASSWORD:-unikin_password}
+      DB_DATABASE: ${DB_DATABASE:-internet_access}
       JWT_SECRET: ${JWT_SECRET}
       MIKROTIK_HOST: ${MIKROTIK_HOST}
       MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
@@ -34,8 +56,9 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM:-noreply@unikin.cd}
       APP_NAME: ${APP_NAME:-Club Internet Access UNIKIN}
-    # Pour Railway, PostgreSQL est un service séparé, pas de depends_on
-    # Pour déploiement local, décommentez la section postgres ci-dessous
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - internet-access-network-prod
     restart: unless-stopped
@@ -55,19 +78,9 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # PostgreSQL pour déploiement local (optionnel)
-  # Pour Railway, utilisez le service PostgreSQL fourni par Railway
-  # postgres:
-  #   image: postgres:14-alpine
-  #   container_name: internet-access-postgres-prod
-  #   environment:
-  #     POSTGRES_USER: ${DB_USERNAME}
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
-  #     POSTGRES_DB: ${DB_DATABASE}
-  #   volumes:
-  #     - postgres_data_prod:/var/lib/postgresql/data
-  #   networks:
-  #     - internet-access-network-prod
+volumes:
+  postgres_data_prod:
+    driver: local
 
 networks:
   internet-access-network-prod:
