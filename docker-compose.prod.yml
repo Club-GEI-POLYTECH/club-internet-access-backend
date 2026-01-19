@@ -1,31 +1,23 @@
-# Docker Compose pour la PRODUCTION
-# Pour Railway, PostgreSQL est fourni comme service séparé
-# Ce fichier peut être utilisé pour déploiement local en production
-
-version: '3.8'
+#version: '3.8'
 
 services:
   postgres:
-    image: postgres:14-alpine
+    image: postgres:15-alpine
     container_name: internet-access-postgres-prod
     environment:
-      POSTGRES_USER: ${DB_USERNAME:-unikin_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-unikin_password}
-      POSTGRES_DB: ${DB_DATABASE:-internet_access}
-      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
-    ports:
-      - "${DB_PORT:-5432}:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - postgres_data_prod:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - internet-access-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-unikin_user} -d ${DB_DATABASE:-internet_access}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
-    networks:
-      - internet-access-network-prod
-    restart: unless-stopped
 
   backend:
     build:
@@ -33,22 +25,20 @@ services:
       dockerfile: Dockerfile
     container_name: internet-access-backend-prod
     ports:
-      - "${BACKEND_PORT:-4000}:4000"
+      - "${PORT:-4000}:4000"
     environment:
       NODE_ENV: production
-      # Pour Railway, utilisez les variables ${{Postgres.PGHOST}}, etc.
-      # Pour déploiement local, utilisez les variables ci-dessous
-      DB_HOST: ${DB_HOST:-postgres}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USERNAME: ${DB_USERNAME:-unikin_user}
-      DB_PASSWORD: ${DB_PASSWORD:-unikin_password}
-      DB_DATABASE: ${DB_DATABASE:-internet_access}
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_NAME}
       JWT_SECRET: ${JWT_SECRET}
       MIKROTIK_HOST: ${MIKROTIK_HOST}
       MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
       MIKROTIK_USER: ${MIKROTIK_USER}
       MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
-      PORT: 4000
       FRONTEND_URL: ${FRONTEND_URL}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -59,31 +49,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - internet-access-network-prod
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    # Limites de ressources
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+    networks:
+      - internet-access-network
 
 volumes:
-  postgres_data_prod:
+  postgres_data:
     driver: local
 
 networks:
-  internet-access-network-prod:
+  internet-access-network:
     driver: bridge
-    # Optionnel: réseau interne uniquement
-    # internal: true
