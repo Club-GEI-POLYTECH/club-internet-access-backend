@@ -29,7 +29,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: internet-access-backend
     dns:
       - 8.8.8.8

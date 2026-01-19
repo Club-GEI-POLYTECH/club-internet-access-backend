@@ -1,33 +1,48 @@
-FROM node:18-alpine
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Configuration npm pour éviter les timeouts et optimiser les téléchargements
+# Configuration npm
 RUN npm config set fetch-timeout 300000 && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
-    npm config set fetch-retry-maxtimeout 120000 && \
-    npm config set maxsockets 1 && \
-    npm config set prefer-offline false
-
-# Installer ts-node globalement pour le seed
-RUN npm install -g ts-node typescript tsconfig-paths
+    npm config set fetch-retry-maxtimeout 120000
 
 # Copier les fichiers de dépendances
 COPY package*.json ./
 COPY tsconfig.json ./
 COPY nest-cli.json ./
 
-# Installer les dépendances (incluant devDependencies pour le build)
-RUN npm install --progress=true --loglevel=info
+# Installer toutes les dépendances (nécessaires pour le build)
+RUN npm ci && npm cache clean --force
 
-# Copier le reste du code
+# Copier le code source
 COPY . .
 
-# Exposer le port
+# Builder l'application
+RUN npm run build
+
+# Stage de production
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copier les fichiers nécessaires
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/nest-cli.json ./
+
+# Créer un utilisateur non-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+# Changer le propriétaire
+RUN chown -R nestjs:nodejs /app
+
+USER nestjs
+
 EXPOSE 4000
 
-# En développement, on construit au démarrage pour éviter les conflits de volumes
-# En production, on peut builder avant
-CMD ["sh", "-c", "npm run build && npm run start:prod"]
-
+CMD ["node", "dist/main"]
