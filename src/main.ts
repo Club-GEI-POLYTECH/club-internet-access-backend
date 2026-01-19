@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -43,6 +44,42 @@ async function bootstrap() {
   // API prefix
   app.setGlobalPrefix('api');
 
+  // Swagger Configuration
+  const config = new DocumentBuilder()
+    .setTitle('Club Internet Access API')
+    .setDescription('API REST pour la gestion d\'accès Wi-Fi via MikroTik RouterOS - Club Internet Access UNIKIN')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Entrez le token JWT',
+        in: 'header',
+      },
+      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+    )
+    .addTag('Auth', 'Endpoints d\'authentification')
+    .addTag('WiFi Accounts', 'Gestion des comptes Wi-Fi')
+    .addTag('Payments', 'Gestion des paiements')
+    .addTag('Sessions', 'Gestion des sessions actives')
+    .addTag('Dashboard', 'Statistiques et dashboard')
+    .addTag('MikroTik', 'Contrôle RouterOS MikroTik')
+    .addTag('Users', 'Gestion des utilisateurs système')
+    .addTag('Bandwidth', 'Statistiques de bande passante')
+    .addTag('App', 'Endpoints publics')
+    .build();
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  });
+
   const port = configService.get<number>('PORT') || 3000;
   const nodeEnv = configService.get<string>('NODE_ENV') || 'development';
   
@@ -58,9 +95,9 @@ async function bootstrap() {
     logger.log(`🚀 Application started on port ${port}`);
     if (railwayPublicDomain) {
       logger.log(`🌐 Public URL: ${baseUrl}`);
-      logger.log(`📚 API Documentation: ${baseUrl}/api`);
+      logger.log(`📚 Swagger API Documentation: ${baseUrl}/api`);
     } else {
-      logger.log(`📚 API Documentation: /api`);
+      logger.log(`📚 Swagger API Documentation: /api`);
     }
     logger.log(`🌍 Environment: ${nodeEnv}`);
     
@@ -75,7 +112,7 @@ async function bootstrap() {
   } else {
     // Logs développement (détaillés)
     logger.log(`🚀 Application is running on: http://localhost:${port}`);
-    logger.log(`📚 API Documentation: http://localhost:${port}/api`);
+    logger.log(`📚 Swagger API Documentation: http://localhost:${port}/api`);
     logger.log(`🌍 Environment: ${nodeEnv}`);
     
     // Afficher les infos DB en développement
