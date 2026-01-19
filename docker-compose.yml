@@ -28,7 +28,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile.dev
     container_name: internet-access-backend
     dns:
@@ -63,35 +63,12 @@ services:
       mailhog:
         condition: service_started
     volumes:
-      - ./backend:/app
+      - .:/app
       - /app/node_modules
     networks:
       - internet-access-network
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    container_name: internet-access-frontend
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: development
-      VITE_API_URL: http://localhost:4000/api
-    depends_on:
-      - backend
-    volumes:
-      # Hot reload en développement - monter le code source
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/dist
-    networks:
-      - internet-access-network
-    restart: unless-stopped
 
   pgadmin:
     image: dpage/pgadmin4:latest
