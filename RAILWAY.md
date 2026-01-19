@@ -42,21 +42,21 @@ Ce guide explique comment déployer le backend et le frontend sur Railway comme 
 2. **Ajouter le service Backend**
    - Cliquez sur "New" → "GitHub Repo"
    - Sélectionnez votre repository
-   - Railway détectera automatiquement le dossier `backend/`
-   - Ou configurez manuellement:
+   - **IMPORTANT**: Configurez manuellement:
      - **Root Directory**: `backend`
-     - **Build Command**: `npm install && npm run build`
-     - **Start Command**: `npm run start:prod`
+     - **Builder**: `DOCKERFILE` (ou `NIXPACKS` si vous préférez)
+     - **Dockerfile Path**: `Dockerfile.prod` (si DOCKERFILE)
+     - **Start Command**: (laissé vide, défini dans Dockerfile)
 
 3. **Ajouter le service Frontend**
    - Cliquez sur "New" → "GitHub Repo" (même repo)
-   - Configurez:
-     - **Root Directory**: `frontend`
-     - **Build Command**: `npm install && npm run build`
-     - **Start Command**: `npm run preview`
-   - **OU** utilisez Docker (recommandé):
-     - Activez "Use Dockerfile" dans les settings
-     - Railway utilisera automatiquement `frontend/Dockerfile.prod`
+   - **IMPORTANT**: Configurez manuellement:
+     - **Root Directory**: `frontend` ⚠️ **OBLIGATOIRE**
+     - **Builder**: `DOCKERFILE` (recommandé) ou `NIXPACKS`
+     - **Dockerfile Path**: `Dockerfile.prod` (si DOCKERFILE)
+     - **Start Command**: (laissé vide, défini dans Dockerfile)
+   
+   **Note**: Les fichiers `railway.json` sont configurés pour utiliser Dockerfile automatiquement, mais vous devez définir le Root Directory dans Railway Dashboard.
 
 4. **Ajouter PostgreSQL**
    - Cliquez sur "New" → "Database" → "PostgreSQL"

@@ -24,11 +24,11 @@ Assurez-vous que votre code est sur GitHub/GitLab/Bitbucket.
 ### 4. Ajouter le Backend
 
 1. Cliquez sur "New" → "GitHub Repo" (même repo)
-2. Railway détectera automatiquement le dossier `backend/`
-3. Si non, configurez:
-   - **Root Directory**: `backend`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run start:prod`
+2. **IMPORTANT**: Configurez manuellement dans Settings:
+   - **Root Directory**: `backend` ⚠️ **OBLIGATOIRE**
+   - **Builder**: `DOCKERFILE`
+   - **Dockerfile Path**: `Dockerfile.prod`
+   - **Start Command**: (laissé vide)
 
 ### 5. Configurer les Variables d'Environnement du Backend
 
@@ -62,14 +62,11 @@ FRONTEND_URL=https://votre-frontend.railway.app
 ### 6. Ajouter le Frontend
 
 1. Cliquez sur "New" → "GitHub Repo" (même repo)
-2. Configurez:
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm run preview`
-   
-   OU utilisez Docker (recommandé):
-   - Activez "Use Dockerfile" dans les settings
-   - Railway utilisera automatiquement `frontend/Dockerfile.prod` (configuré dans `frontend/railway.json`)
+2. **IMPORTANT**: Configurez manuellement dans Settings:
+   - **Root Directory**: `frontend` ⚠️ **OBLIGATOIRE**
+   - **Builder**: `DOCKERFILE` (recommandé)
+   - **Dockerfile Path**: `Dockerfile.prod`
+   - **Start Command**: (laissé vide)
 
 ### 7. Configurer les Variables d'Environnement du Frontend
 
