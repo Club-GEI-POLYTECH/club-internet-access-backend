@@ -17,14 +17,15 @@ export const databaseConfig = (
   const pgPassword = configService.get<string>('PGPASSWORD');
   const pgDatabase = configService.get<string>('PGDATABASE');
 
-  logger.log(`✅ Using PG* variables (Railway nomenclature)`);
-  logger.log(isDevelopment, "Développement")
-  logger.log(isProduction, "Production")
-  logger.log(`   Host: ${pgHost}`);
-  logger.log(`   Port: ${pgPort || 5432}`);
-  logger.log(`   Database: ${pgDatabase}`);
-  logger.log(`   User: ${pgUser}`);
-  logger.log(`   NODE_ENV: ${configService.get<string>('NODE_ENV')}, isProduction: ${isProduction}`);
+  // Log pour débogage
+  logger.log(`🔍 Checking for PG* variables (Railway nomenclature)...`);
+  logger.log(`   PGHOST: ${pgHost || 'NOT FOUND'}`);
+  logger.log(`   PGPORT: ${pgPort || 'NOT FOUND'}`);
+  logger.log(`   PGUSER: ${pgUser || 'NOT FOUND'}`);
+  logger.log(`   PGPASSWORD: ${pgPassword ? '***' : 'NOT FOUND'}`);
+  logger.log(`   PGDATABASE: ${pgDatabase || 'NOT FOUND'}`);
+  logger.log(`   NODE_ENV: ${configService.get<string>('NODE_ENV')}`);
+  logger.log(`   isProduction: ${isProduction}`);
 
   if (pgHost && pgUser && pgPassword && pgDatabase) {
     logger.log(`✅ Using PG* variables (Railway nomenclature)`);
