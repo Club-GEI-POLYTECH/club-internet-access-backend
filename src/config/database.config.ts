@@ -16,7 +16,16 @@ export const databaseConfig = (
   const pgUser = configService.get<string>('PGUSER');
   const pgPassword = configService.get<string>('PGPASSWORD');
   const pgDatabase = configService.get<string>('PGDATABASE');
-  
+
+  logger.log(`✅ Using PG* variables (Railway nomenclature)`);
+  logger.log(isDevelopment, "Développement")
+  logger.log(isProduction, "Production")
+  logger.log(`   Host: ${pgHost}`);
+  logger.log(`   Port: ${pgPort || 5432}`);
+  logger.log(`   Database: ${pgDatabase}`);
+  logger.log(`   User: ${pgUser}`);
+  logger.log(`   NODE_ENV: ${configService.get<string>('NODE_ENV')}, isProduction: ${isProduction}`);
+
   if (pgHost && pgUser && pgPassword && pgDatabase) {
     logger.log(`✅ Using PG* variables (Railway nomenclature)`);
     logger.log(`   Host: ${pgHost}`);
