@@ -47,7 +47,7 @@ export const databaseConfig = (
         : [__dirname + '/../../migrations/*{.ts,.js}'],
       migrationsRun: false,
       migrationsTableName: 'migrations',
-      synchronize: false, // ⚠️ DÉSACTIVÉ en production - utiliser les migrations
+      synchronize: false, // ⚠️ TEMPORAIRE: Activer pour la première production. DÉSACTIVER APRÈS LA PREMIÈRE SYNCHRONISATION !
       logging: isDevelopment,
       ssl: sslConfig,
       // Options de connexion pour Railway
@@ -62,7 +62,6 @@ export const databaseConfig = (
       // Retry configuration
       retryAttempts: 5,
       retryDelay: 3000,
-      autoLoadEntities: true,
     };
   }
   
@@ -87,8 +86,5 @@ export const databaseConfig = (
     synchronize: isDevelopment,
     logging: isDevelopment,
     ssl: false, // Pas de SSL en local
-    retryAttempts: 10,
-    retryDelay: 3000,
-    autoLoadEntities: true,
   };
 };
