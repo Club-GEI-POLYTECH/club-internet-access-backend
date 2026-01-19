@@ -1,0 +1,4 @@
+# Ce fichier indique à Railway que ce projet a des services dans des sous-dossiers
+# Configurez le Root Directory dans Railway Dashboard pour chaque service:
+# - Backend: Root Directory = "backend"
+# - Frontend: Root Directory = "frontend"

@@ -27,19 +27,12 @@ Les fichiers `railway.json` sont déjà configurés pour utiliser Dockerfile au 
    - Root Directory: `frontend`
    - Dockerfile Path: `Dockerfile.prod`
 
-#### Solution 2: Utiliser Nixpacks avec Root Directory
+#### Solution 2: Utiliser Nixpacks (Non recommandé)
 
-Si vous préférez utiliser Nixpacks :
+⚠️ **Note**: Cette solution n'est pas recommandée car les fichiers `nixpacks.toml` ont été supprimés.
+Utilisez plutôt la Solution 1 avec Dockerfile.
 
-1. **Service Backend:**
-   - Settings → Build → Builder: **NIXPACKS**
-   - Root Directory: `backend`
-   - Le fichier `backend/nixpacks.toml` sera utilisé automatiquement
-
-2. **Service Frontend:**
-   - Settings → Build → Builder: **NIXPACKS**
-   - Root Directory: `frontend`
-   - Le fichier `frontend/nixpacks.toml` sera utilisé automatiquement
+Si vous voulez absolument utiliser Nixpacks, vous devrez recréer les fichiers `nixpacks.toml`.
 
 #### Solution 3: Configuration via Railway CLI
 
@@ -82,7 +75,7 @@ Start Command: (laissé vide, défini dans Dockerfile)
 Après configuration, vérifiez que :
 
 1. ✅ Le Root Directory est défini (backend ou frontend)
-2. ✅ Le Builder est DOCKERFILE (ou NIXPACKS avec nixpacks.toml)
+2. ✅ Le Builder est DOCKERFILE
 3. ✅ Le Dockerfile Path pointe vers le bon fichier
 4. ✅ Les variables d'environnement sont configurées
 

@@ -1,24 +1,24 @@
 # Configuration Railway pour Club Internet Access
+# NOTE: Ce fichier est pour référence. Vous DEVEZ configurer le Root Directory dans Railway Dashboard.
+# IMPORTANT: Utilisez DOCKERFILE, pas NIXPACKS
 
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
 
 # Configuration pour le service backend
+# Le Root Directory doit être configuré dans Railway Dashboard: "backend"
 [services.backend]
 build = { root = "./backend" }
-start = "npm run start:prod"
-watch = ["backend/src"]
 
 [services.backend.variables]
 NODE_ENV = "production"
 PORT = "4000"
 
 # Configuration pour le service frontend
+# Le Root Directory doit être configuré dans Railway Dashboard: "frontend"
 [services.frontend]
 build = { root = "./frontend" }
-start = "npm run preview"
-watch = ["frontend/src"]
 
 [services.frontend.variables]
 NODE_ENV = "production"
-PORT = "3000"
+PORT = "80"

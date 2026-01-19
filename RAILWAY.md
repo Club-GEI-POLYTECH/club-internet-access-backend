@@ -44,16 +44,16 @@ Ce guide explique comment déployer le backend et le frontend sur Railway comme 
    - Sélectionnez votre repository
    - **IMPORTANT**: Configurez manuellement:
      - **Root Directory**: `backend`
-     - **Builder**: `DOCKERFILE` (ou `NIXPACKS` si vous préférez)
-     - **Dockerfile Path**: `Dockerfile.prod` (si DOCKERFILE)
+     - **Builder**: `DOCKERFILE` ⚠️ **OBLIGATOIRE** (pas NIXPACKS)
+     - **Dockerfile Path**: `Dockerfile.prod`
      - **Start Command**: (laissé vide, défini dans Dockerfile)
 
 3. **Ajouter le service Frontend**
    - Cliquez sur "New" → "GitHub Repo" (même repo)
    - **IMPORTANT**: Configurez manuellement:
      - **Root Directory**: `frontend` ⚠️ **OBLIGATOIRE**
-     - **Builder**: `DOCKERFILE` (recommandé) ou `NIXPACKS`
-     - **Dockerfile Path**: `Dockerfile.prod` (si DOCKERFILE)
+     - **Builder**: `DOCKERFILE` ⚠️ **OBLIGATOIRE** (pas NIXPACKS)
+     - **Dockerfile Path**: `Dockerfile.prod`
      - **Start Command**: (laissé vide, défini dans Dockerfile)
    
    **Note**: Les fichiers `railway.json` sont configurés pour utiliser Dockerfile automatiquement, mais vous devez définir le Root Directory dans Railway Dashboard.
