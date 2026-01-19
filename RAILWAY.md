@@ -20,7 +20,7 @@ Ce guide explique comment déployer le backend et le frontend sur Railway comme 
          ▼
 ┌─────────────────┐
 │   Backend        │  (Service NestJS)
-│   (Port 4000)    │
+│   (Port 3000)    │
 └────────┬─────────┘
          │
          │ TypeORM
@@ -93,12 +93,10 @@ railway up
 Dans Railway Dashboard → Backend Service → Variables:
 
 ```env
-# Database (utilisez les variables fournies par Railway PostgreSQL)
-DB_HOST=${{Postgres.PGHOST}}
-DB_PORT=${{Postgres.PGPORT}}
-DB_USERNAME=${{Postgres.PGUSER}}
-DB_PASSWORD=${{Postgres.PGPASSWORD}}
-DB_DATABASE=${{Postgres.PGDATABASE}}
+# Database - Railway fournit automatiquement les variables PG* pour PostgreSQL
+# Le backend détecte automatiquement: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+# Vous n'avez PAS besoin de créer ces variables manuellement !
+# Si vous utilisez un service PostgreSQL Railway, ces variables sont déjà disponibles
 
 # JWT
 JWT_SECRET=votre-secret-jwt-super-securise-changez-moi
@@ -111,7 +109,7 @@ MIKROTIK_PASSWORD=votre-mot-de-passe-mikrotik
 
 # Application
 NODE_ENV=production
-PORT=4000
+PORT=3000
 FRONTEND_URL=https://votre-frontend.railway.app
 
 # Email (si vous utilisez un service SMTP)
@@ -195,8 +193,10 @@ Pour utiliser le Dockerfile:
 
 ### Backend ne se connecte pas à la base de données
 
-- Vérifiez que les variables d'environnement PostgreSQL sont correctement configurées
-- Utilisez les variables Railway: `${{Postgres.PGHOST}}`, etc.
+- Railway fournit automatiquement les variables `PG*` (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE) pour les services PostgreSQL
+- Le backend détecte automatiquement ces variables en priorité
+- Vérifiez dans les logs que vous voyez: `✅ Using PG* variables (Railway nomenclature)`
+- Si vous voyez `⚠️ PG* variables not found, falling back to DB_* variables`, vérifiez que le service PostgreSQL est bien lié au service backend
 - Vérifiez les logs: Railway Dashboard → Backend Service → Deployments → View Logs
 
 ### Frontend ne peut pas accéder à l'API

@@ -33,16 +33,11 @@ Railway ne détecte pas automatiquement plusieurs services depuis `docker-compos
 
 4. **Lier les services avec des variables d'environnement**
    - Dans le service **Backend** → **Variables**
-   - Ajoutez ces variables en utilisant les références Railway :
-     ```
-     DB_HOST=${{Postgres.PGHOST}}
-     DB_PORT=${{Postgres.PGPORT}}
-     DB_USERNAME=${{Postgres.PGUSER}}
-     DB_PASSWORD=${{Postgres.PGPASSWORD}}
-     DB_DATABASE=${{Postgres.PGDATABASE}}
-     ```
+   - Railway fournit automatiquement les variables `PG*` pour les services PostgreSQL
+   - Le backend détecte automatiquement ces variables (priorité 1)
+   - **Vous n'avez PAS besoin de créer ces variables manuellement** - Railway les génère automatiquement
    
-   **Note**: Remplacez `Postgres` par le nom exact du service PostgreSQL créé dans Railway (peut être `Postgres`, `postgres`, `PostgreSQL`, etc.)
+   **Note**: Le backend utilise automatiquement les variables `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` si elles sont disponibles (Railway), sinon il utilise les variables `DB_*` en fallback (local/Docker)
 
 5. **Ajouter les autres variables d'environnement**
    - Ajoutez toutes les autres variables nécessaires :
@@ -108,7 +103,7 @@ Avant de déployer, vérifiez que :
 - [ ] Le service **Backend** est configuré avec `Builder: DOCKERFILE`
 - [ ] Le service **PostgreSQL** est créé et visible dans Railway Dashboard
 - [ ] Les variables d'environnement du backend utilisent les références Railway (`${{Postgres.*}}`)
-- [ ] Le fichier `railway.json` contient `startCommand: "node dist/main"`
+- [ ] Le fichier `railway.json` contient `startCommand: "node dist/main.js"`
 - [ ] Le `Dockerfile` est à la racine du projet
 - [ ] Le fichier `docker-compose.prod.yml` existe (pour référence, mais Railway utilisera directement le Dockerfile)
 
