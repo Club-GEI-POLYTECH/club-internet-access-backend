@@ -1,0 +1,24 @@
+# Fichiers à ignorer lors du déploiement Railway
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+coverage/
+.nyc_output/
+docker-compose.yml
+Dockerfile
+Dockerfile.prod
+.git/
+.gitignore
+README.md
+*.md
+!RAILWAY.md

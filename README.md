@@ -35,26 +35,38 @@ Système complet de gestion d'accès Wi-Fi avec interface web pour MikroTik Rout
 
 ### Option 1: Docker (Recommandé) 🐳
 
+#### Développement Local
+
 ```bash
-# 1. Configurer les variables d'environnement
-cp .docker-compose.env.example .env
-
-# 2. Éditer .env avec vos paramètres (MikroTik, JWT_SECRET, etc.)
-
-# 3. Démarrer tous les services
+# 1. Démarrer tous les services (développement)
 docker-compose up -d
 
-# 4. Créer l'utilisateur admin
+# 2. Créer l'utilisateur admin
 docker-compose exec backend npm run seed:admin
 ```
 
-**Accès:**
+**Accès (Développement):**
+- **Frontend**: http://localhost:3000 (avec hot reload)
 - **Backend API**: http://localhost:4000/api
 - **PgAdmin**: http://localhost:5050 (admin@unikin.cd / admin)
 - **Adminer**: http://localhost:8080
 - **MailHog**: http://localhost:8025 (pour les emails de test)
 
-Voir [SETUP.md](./SETUP.md) pour le guide complet de démarrage.
+#### Production
+
+```bash
+# 1. Configurer les variables d'environnement
+cp .docker-compose.env.example .docker-compose.env
+# Éditer .docker-compose.env avec vos paramètres (MikroTik, JWT_SECRET, etc.)
+
+# 2. Démarrer en production
+docker-compose --env-file .docker-compose.env -f docker-compose.prod.yml up -d
+
+# 3. Créer l'utilisateur admin
+docker-compose -f docker-compose.prod.yml exec backend npm run seed:admin
+```
+
+Voir [DOCKER_COMPOSE.md](./DOCKER_COMPOSE.md) pour le guide complet Docker Compose.
 
 ### Option 2: Installation Manuelle
 

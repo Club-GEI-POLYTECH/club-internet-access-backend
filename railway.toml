@@ -1,0 +1,24 @@
+# Configuration Railway pour Club Internet Access
+
+[build]
+builder = "NIXPACKS"
+
+# Configuration pour le service backend
+[services.backend]
+build = { root = "./backend" }
+start = "npm run start:prod"
+watch = ["backend/src"]
+
+[services.backend.variables]
+NODE_ENV = "production"
+PORT = "4000"
+
+# Configuration pour le service frontend
+[services.frontend]
+build = { root = "./frontend" }
+start = "npm run preview"
+watch = ["frontend/src"]
+
+[services.frontend.variables]
+NODE_ENV = "production"
+PORT = "3000"

@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: internet-access-postgres-prod
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-unikin_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-unikin_password}
+      POSTGRES_DB: ${DB_DATABASE:-internet_access}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-unikin_user} -d ${DB_DATABASE:-internet_access}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internet-access-network-prod
+    restart: unless-stopped
+    # Sécurité: ne pas exposer les ports en production si possible
+    # ports:
+    #   - "5432:5432"  # Retirer si accès uniquement via réseau interne
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: internet-access-backend-prod
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-unikin_user}
+      DB_PASSWORD: ${DB_PASSWORD:-unikin_password}
+      DB_DATABASE: ${DB_DATABASE:-internet_access}
+      JWT_SECRET: ${JWT_SECRET}
+      MIKROTIK_HOST: ${MIKROTIK_HOST}
+      MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
+      MIKROTIK_USER: ${MIKROTIK_USER}
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
+      PORT: 4000
+      FRONTEND_URL: ${FRONTEND_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM:-noreply@unikin.cd}
+      APP_NAME: ${APP_NAME:-Club Internet Access UNIKIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internet-access-network-prod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Les variables VITE doivent être définies au build (pas au runtime)
+        # Créez un fichier .env dans ./frontend/ avec VITE_API_URL=...
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:4000/api}
+    container_name: internet-access-frontend-prod
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - internet-access-network-prod
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Limites de ressources
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  postgres_data_prod:
+    driver: local
+
+networks:
+  internet-access-network-prod:
+    driver: bridge
+    # Optionnel: réseau interne uniquement
+    # internal: true
