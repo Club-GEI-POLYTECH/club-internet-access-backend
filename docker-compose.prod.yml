@@ -3,7 +3,7 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: internet-access-postgres-prod
+    container_name: internet_access_postgres_prod
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -12,7 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - internet-access-network
+      - internet_access_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
@@ -23,12 +23,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: internet-access-backend-prod
+    container_name: internet_access_backend_prod
     ports:
-      - "${PORT:-4000}:4000"
+      - "${PORT:-3000}:3000"
     environment:
       NODE_ENV: production
-      PORT: 4000
+      PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: ${DB_USER}
@@ -51,12 +51,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - internet-access-network
+      - internet_access_network
 
 volumes:
   postgres_data:
     driver: local
 
 networks:
-  internet-access-network:
+  internet_access_network:
     driver: bridge

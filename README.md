@@ -37,6 +37,7 @@ L'API sera accessible sur `http://localhost:4000/api`
 - [Documentation API](./API.md)
 - [Guide Docker Compose](./DOCKER_COMPOSE.md)
 - [Guide de déploiement Railway](./RAILWAY.md)
+- [**Guide configuration multi-services Railway**](./RAILWAY_MULTI_SERVICE_SETUP.md) ⭐ **Important pour détecter backend + postgres**
 - [Guide d'insertion des données](./SEED_GUIDE.md)
 
 ## 🏗️ Architecture

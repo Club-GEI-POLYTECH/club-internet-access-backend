@@ -1,15 +1,29 @@
 # Configuration Railway pour Club Internet Access Backend
-# Railway utilise principalement railway.json et docker-compose.prod.yml
-# Ce fichier est optionnel et peut être utilisé pour des configurations supplémentaires
+# Railway utilise principalement railway.json pour la configuration
+# Pour que Railway détecte automatiquement les services (backend + postgres),
+# vous devez créer manuellement le service PostgreSQL dans Railway Dashboard
+# OU utiliser un template multi-service Railway
 
 [build]
 builder = "DOCKERFILE"
 dockerfile = "Dockerfile"
 
 [deploy]
+startCommand = "node dist/main.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
 [env]
 NODE_ENV = "production"
-PORT = "4000"
+PORT = "3000"
+
+# Note: Railway ne détecte PAS automatiquement plusieurs services depuis docker-compose.yml
+# Pour avoir backend + postgres, vous devez:
+# 1. Créer le service backend (via GitHub repo ou Railway CLI)
+# 2. Ajouter manuellement un service PostgreSQL (via Railway Dashboard: New > Database > PostgreSQL)
+# 3. Lier les services avec des variables d'environnement:
+#    - DB_HOST=${{Postgres.PGHOST}}
+#    - DB_PORT=${{Postgres.PGPORT}}
+#    - DB_USERNAME=${{Postgres.PGUSER}}
+#    - DB_PASSWORD=${{Postgres.PGPASSWORD}}
+#    - DB_DATABASE=${{Postgres.PGDATABASE}}

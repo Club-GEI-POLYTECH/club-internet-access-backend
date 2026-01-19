@@ -1,127 +1,63 @@
-# Docker Compose pour le DÉVELOPPEMENT LOCAL
-# Pour la production, utilisez: docker-compose -f docker-compose.prod.yml up
-
-version: '3.8'
+﻿version: '3.8'
 
 services:
   postgres:
-    image: postgres:14-alpine
-    container_name: internet-access-postgres
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    image: postgres:15-alpine
+    container_name: internet_access_postgres_prod
     environment:
-      POSTGRES_USER: unikin_user
-      POSTGRES_PASSWORD: unikin_password
-      POSTGRES_DB: internet_access
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internet_access_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U unikin_user -d internet_access"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - internet-access-network
 
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    container_name: internet-access-backend
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      dockerfile: Dockerfile
+    container_name: internet-access-backend-prod
     ports:
-      - "4000:4000"
+      - "${PORT:-3000}:3000"
     environment:
-      NODE_ENV: development
-      # Hot reload activé via volumes
+      NODE_ENV: production
+      PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: unikin_user
-      DB_PASSWORD: unikin_password
-      DB_DATABASE: internet_access
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      MIKROTIK_HOST: ${MIKROTIK_HOST:-192.168.88.1}
+      DB_USERNAME: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      MIKROTIK_HOST: ${MIKROTIK_HOST}
       MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
-      MIKROTIK_USER: ${MIKROTIK_USER:-admin}
-      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD:-}
-      PORT: 4000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      SMTP_HOST: mailhog
-      SMTP_PORT: 1025
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: noreply@unikin.cd
-      APP_NAME: Club Internet Access UNIKIN
+      MIKROTIK_USER: ${MIKROTIK_USER}
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM:-noreply@unikin.cd}
+      APP_NAME: ${APP_NAME:-Club Internet Access UNIKIN}
     depends_on:
       postgres:
         condition: service_healthy
-      mailhog:
-        condition: service_started
-    volumes:
-      - .:/app
-      - /app/node_modules
-    networks:
-      - internet-access-network
     restart: unless-stopped
-
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: internet-access-pgadmin
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@unikin.cd
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
     networks:
-      - internet-access-network
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-
-  adminer:
-    image: adminer:latest
-    container_name: internet-access-adminer
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-    networks:
-      - internet-access-network
-
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: internet-access-mailhog
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web UI
-    networks:
-      - internet-access-network
-    restart: unless-stopped
+      - internet_access_network
 
 volumes:
   postgres_data:
-  pgadmin_data:
+    driver: local
 
 networks:
-  internet-access-network:
+  internet_access_network:
     driver: bridge
-
-
