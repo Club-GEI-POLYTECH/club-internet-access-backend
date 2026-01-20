@@ -36,6 +36,7 @@ L'API sera accessible sur `http://localhost:4000/api`
 - [Guide d'installation](./INSTALLATION.md)
 - [Documentation API](./API.md) - Documentation Swagger complète
 - [**Intégration Frontend Next.js**](./INTEGRATION_FRONTEND.md) ⭐ **Guide complet pour intégrer le frontend**
+- [**Configuration CORS**](./CONFIGURATION_CORS.md) ⭐ **Où configurer FRONTEND_URL pour CORS**
 - [**Types TypeScript**](./frontend-types.ts) ⭐ **Types réutilisables pour Next.js**
 - [**Guide de déploiement terrain**](./DEPLOIEMENT_TERRAIN.md) ⭐ **Déploiement réseau réel (Starlink → MikroTik → AP Cisco)**
 - [**Configuration post-installation**](./CONFIGURATION_POST_INSTALLATION.md) ⭐ **Configuration backend après installation réseau**

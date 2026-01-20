@@ -57,7 +57,7 @@ export const databaseConfig = (
         : [__dirname + '/../../migrations/*{.ts,.js}'],
       migrationsRun: false,
       migrationsTableName: 'migrations',
-      synchronize: false, // ⚠️ TEMPORAIRE: Activer pour la première production. DÉSACTIVER APRÈS LA PREMIÈRE SYNCHRONISATION !
+      synchronize: true, // ⚠️ TEMPORAIRE: Activer pour la première production. DÉSACTIVER APRÈS LA PREMIÈRE SYNCHRONISATION !
       logging: isDevelopment,
       ssl: sslConfig,
       // Options de connexion pour Railway
@@ -93,8 +93,8 @@ export const databaseConfig = (
     migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
     migrationsRun: false,
     migrationsTableName: 'migrations',
-    synchronize: isProduction,
-    logging: isProduction,
+    synchronize: isDevelopment,
+    logging: isDevelopment,
     ssl: false, // Pas de SSL en local
   };
 };
