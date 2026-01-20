@@ -93,8 +93,8 @@ export const databaseConfig = (
     migrations: [__dirname + '/../../migrations/*{.ts,.js}'],
     migrationsRun: false,
     migrationsTableName: 'migrations',
-    synchronize: isDevelopment,
-    logging: isDevelopment,
+    synchronize: isProduction,
+    logging: isProduction,
     ssl: false, // Pas de SSL en local
   };
 };
