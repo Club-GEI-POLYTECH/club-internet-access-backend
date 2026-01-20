@@ -4,6 +4,7 @@ import { Repository, LessThan } from 'typeorm';
 import { WiFiAccount, DurationType } from '../entities/wifi-account.entity';
 import { MikroTikService } from '../mikrotik/mikrotik.service';
 import { CreateWiFiAccountDto } from './dto/create-wifi-account.dto';
+import { UserRole } from '../entities/user.entity';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -110,18 +111,37 @@ export class WiFiAccountsService {
     return savedAccount;
   }
 
-  async findAll(): Promise<WiFiAccount[]> {
+  async findAll(userId?: string, userRole?: UserRole): Promise<WiFiAccount[]> {
+    // Les étudiants voient uniquement leurs propres comptes
+    if (userRole === UserRole.STUDENT && userId) {
+      return await this.wifiAccountsRepository.find({
+        where: { createdById: userId },
+        relations: ['createdBy', 'payments', 'sessions'],
+        order: { createdAt: 'DESC' },
+      });
+    }
+    
+    // Admin et Agent voient tous les comptes
     return await this.wifiAccountsRepository.find({
       relations: ['createdBy', 'payments', 'sessions'],
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: string): Promise<WiFiAccount> {
-    return await this.wifiAccountsRepository.findOne({
+  async findOne(id: string, userId?: string, userRole?: UserRole): Promise<WiFiAccount> {
+    const account = await this.wifiAccountsRepository.findOne({
       where: { id },
       relations: ['createdBy', 'payments', 'sessions'],
     });
+    
+    // Les étudiants ne peuvent voir que leurs propres comptes
+    if (account && userRole === UserRole.STUDENT && userId) {
+      if (account.createdById !== userId) {
+        throw new Error('Account not found');
+      }
+    }
+    
+    return account;
   }
 
   async findByUsername(username: string): Promise<WiFiAccount> {
@@ -175,12 +195,19 @@ export class WiFiAccountsService {
     return expiredAccounts.length;
   }
 
-  async getActiveAccounts(): Promise<WiFiAccount[]> {
+  async getActiveAccounts(userId?: string, userRole?: UserRole): Promise<WiFiAccount[]> {
+    const where: any = {
+      isActive: true,
+      isExpired: false,
+    };
+    
+    // Les étudiants voient uniquement leurs propres comptes actifs
+    if (userRole === UserRole.STUDENT && userId) {
+      where.createdById = userId;
+    }
+    
     return await this.wifiAccountsRepository.find({
-      where: {
-        isActive: true,
-        isExpired: false,
-      },
+      where,
       relations: ['sessions'],
     });
   }

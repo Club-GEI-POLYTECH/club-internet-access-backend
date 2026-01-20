@@ -161,5 +161,9 @@ export class AuthService {
 
     return { message: 'Mot de passe réinitialisé avec succès' };
   }
+
+  async getUserProfile(userId: string) {
+    return await this.usersService.findOne(userId);
+  }
 }
 

@@ -3,6 +3,9 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } 
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../entities/user.entity';
 import { PaymentStatus } from '../entities/payment.entity';
 
 @ApiTags('Payments')
@@ -45,19 +48,21 @@ export class PaymentController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lister tous les paiements', description: 'Retourne la liste de tous les paiements' })
+  @ApiOperation({ summary: 'Lister les paiements', description: 'Retourne la liste des paiements. Les étudiants voient uniquement leurs propres paiements.' })
   @ApiResponse({ status: 200, description: 'Liste des paiements récupérée avec succès' })
-  async findAll() {
-    return await this.paymentService.findAll();
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  async findAll(@Request() req) {
+    return await this.paymentService.findAll(req.user?.userId, req.user?.role);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Obtenir un paiement', description: 'Récupère les détails d\'un paiement spécifique' })
+  @ApiOperation({ summary: 'Obtenir un paiement', description: 'Récupère les détails d\'un paiement spécifique. Les étudiants ne peuvent voir que leurs propres paiements.' })
   @ApiParam({ name: 'id', description: 'UUID du paiement' })
   @ApiResponse({ status: 200, description: 'Paiement récupéré avec succès' })
   @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
-  async findOne(@Param('id') id: string) {
-    return await this.paymentService.findOne(id);
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  async findOne(@Param('id') id: string, @Request() req) {
+    return await this.paymentService.findOne(id, req.user?.userId, req.user?.role);
   }
 
   @Get('transaction/:transactionId')

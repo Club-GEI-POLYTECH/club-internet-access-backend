@@ -5,6 +5,7 @@ import { Payment, PaymentStatus } from '../entities/payment.entity';
 import { WiFiAccountsService } from '../wifi-accounts/wifi-accounts.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { DurationType, BandwidthProfile } from '../entities/wifi-account.entity';
+import { UserRole } from '../entities/user.entity';
 
 @Injectable()
 export class PaymentService {
@@ -94,18 +95,35 @@ export class PaymentService {
     }
   }
 
-  async findAll(): Promise<Payment[]> {
-    return await this.paymentRepository.find({
-      relations: ['wifiAccount', 'createdBy'],
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(userId?: string, userRole?: UserRole): Promise<Payment[]> {
+    const queryBuilder = this.paymentRepository
+      .createQueryBuilder('payment')
+      .leftJoinAndSelect('payment.wifiAccount', 'wifiAccount')
+      .leftJoinAndSelect('payment.createdBy', 'createdBy')
+      .orderBy('payment.createdAt', 'DESC');
+    
+    // Les étudiants voient uniquement leurs propres paiements
+    if (userRole === UserRole.STUDENT && userId) {
+      queryBuilder.where('payment.createdById = :userId', { userId });
+    }
+    
+    return await queryBuilder.getMany();
   }
 
-  async findOne(id: string): Promise<Payment> {
-    return await this.paymentRepository.findOne({
+  async findOne(id: string, userId?: string, userRole?: UserRole): Promise<Payment> {
+    const payment = await this.paymentRepository.findOne({
       where: { id },
       relations: ['wifiAccount', 'createdBy'],
     });
+    
+    // Les étudiants ne peuvent voir que leurs propres paiements
+    if (payment && userRole === UserRole.STUDENT && userId) {
+      if (payment.createdById !== userId) {
+        throw new Error('Payment not found');
+      }
+    }
+    
+    return payment;
   }
 
   async findByTransactionId(transactionId: string): Promise<Payment> {

@@ -62,8 +62,19 @@ export class AuthController {
   @ApiOperation({ summary: 'Obtenir le profil', description: 'Récupère le profil de l\'utilisateur connecté' })
   @ApiResponse({ status: 200, description: 'Profil utilisateur récupéré avec succès' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
-  getProfile(@Request() req) {
-    return req.user;
+  async getProfile(@Request() req) {
+    const user = await this.authService.getUserProfile(req.user.userId);
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   @Post('forgot-password')

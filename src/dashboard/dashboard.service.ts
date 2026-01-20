@@ -28,16 +28,21 @@ export class DashboardService {
       expiredAccounts,
       totalPayments,
       completedPayments,
+      pendingPayments,
+      failedPayments,
       totalRevenue,
       totalSessions,
       activeSessions,
       totalUsers,
+      activeUsers,
     ] = await Promise.all([
       this.wifiAccountsRepository.count(),
       this.wifiAccountsRepository.count({ where: { isActive: true, isExpired: false } }),
       this.wifiAccountsRepository.count({ where: { isExpired: true } }),
       this.paymentsRepository.count(),
       this.paymentsRepository.count({ where: { status: PaymentStatus.COMPLETED } }),
+      this.paymentsRepository.count({ where: { status: PaymentStatus.PENDING } }),
+      this.paymentsRepository.count({ where: { status: PaymentStatus.FAILED } }),
       this.paymentsRepository
         .createQueryBuilder('payment')
         .select('SUM(payment.amount)', 'total')
@@ -46,6 +51,7 @@ export class DashboardService {
       this.sessionsRepository.count(),
       this.sessionsRepository.count({ where: { isActive: true } }),
       this.usersRepository.count(),
+      this.usersRepository.count({ where: { isActive: true } }),
     ]);
 
     // Get MikroTik active users separately to handle errors gracefully
@@ -83,6 +89,8 @@ export class DashboardService {
       payments: {
         total: totalPayments,
         completed: completedPayments,
+        pending: pendingPayments,
+        failed: failedPayments,
         revenue: parseFloat(totalRevenue?.total || '0'),
       },
       sessions: {
@@ -93,6 +101,7 @@ export class DashboardService {
       },
       users: {
         total: totalUsers,
+        active: activeUsers,
       },
       recent: {
         accounts: recentAccounts,
@@ -105,15 +114,39 @@ export class DashboardService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Accounts created per day
+    // Accounts created and expired per day
     const accountsByDay = await this.wifiAccountsRepository
       .createQueryBuilder('account')
       .select('DATE(account.createdAt)', 'date')
-      .addSelect('COUNT(*)', 'count')
+      .addSelect('COUNT(*)', 'created')
       .where('account.createdAt >= :startDate', { startDate })
       .groupBy('DATE(account.createdAt)')
       .orderBy('date', 'ASC')
       .getRawMany();
+
+    const expiredByDay = await this.wifiAccountsRepository
+      .createQueryBuilder('account')
+      .select('DATE(account.updatedAt)', 'date')
+      .addSelect('COUNT(*)', 'expired')
+      .where('account.updatedAt >= :startDate', { startDate })
+      .andWhere('account.isExpired = :isExpired', { isExpired: true })
+      .groupBy('DATE(account.updatedAt)')
+      .orderBy('date', 'ASC')
+      .getRawMany();
+
+    // Merge accounts data
+    const accountsMap = new Map();
+    accountsByDay.forEach(item => {
+      accountsMap.set(item.date, { date: item.date, created: parseInt(item.created), expired: 0 });
+    });
+    expiredByDay.forEach(item => {
+      if (accountsMap.has(item.date)) {
+        accountsMap.get(item.date).expired = parseInt(item.expired);
+      } else {
+        accountsMap.set(item.date, { date: item.date, created: 0, expired: parseInt(item.expired) });
+      }
+    });
+    const accountsData = Array.from(accountsMap.values());
 
     // Payments per day
     const paymentsByDay = await this.paymentsRepository
@@ -127,9 +160,44 @@ export class DashboardService {
       .orderBy('date', 'ASC')
       .getRawMany();
 
+    // Sessions per day
+    const sessionsByDay = await this.sessionsRepository
+      .createQueryBuilder('session')
+      .select('DATE(session.createdAt)', 'date')
+      .addSelect('COUNT(*)', 'new')
+      .where('session.createdAt >= :startDate', { startDate })
+      .groupBy('DATE(session.createdAt)')
+      .orderBy('date', 'ASC')
+      .getRawMany();
+
+    const activeSessionsByDay = await this.sessionsRepository
+      .createQueryBuilder('session')
+      .select('DATE(session.updatedAt)', 'date')
+      .addSelect('COUNT(*)', 'active')
+      .where('session.updatedAt >= :startDate', { startDate })
+      .andWhere('session.isActive = :isActive', { isActive: true })
+      .groupBy('DATE(session.updatedAt)')
+      .orderBy('date', 'ASC')
+      .getRawMany();
+
+    // Merge sessions data
+    const sessionsMap = new Map();
+    sessionsByDay.forEach(item => {
+      sessionsMap.set(item.date, { date: item.date, new: parseInt(item.new), active: 0 });
+    });
+    activeSessionsByDay.forEach(item => {
+      if (sessionsMap.has(item.date)) {
+        sessionsMap.get(item.date).active = parseInt(item.active);
+      } else {
+        sessionsMap.set(item.date, { date: item.date, new: 0, active: parseInt(item.active) });
+      }
+    });
+    const sessionsData = Array.from(sessionsMap.values());
+
     return {
-      accounts: accountsByDay,
+      accounts: accountsData,
       payments: paymentsByDay,
+      sessions: sessionsData,
     };
   }
 }
