@@ -15,15 +15,28 @@ async function bootstrap() {
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
     : ['http://localhost:3000'];
   
+  // Logger les origines CORS autorisées
+  logger.log('🌐 CORS Configuration:');
+  logger.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+  logger.log(`   Total origins: ${allowedOrigins.length}`);
+  
   app.enableCors({
     origin: (origin, callback) => {
       // Permettre les requêtes sans origine (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        logger.debug('✅ CORS: Request without origin allowed (mobile app, Postman, etc.)');
+        return callback(null, true);
+      }
       
       // Vérifier si l'origine est autorisée
-      if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
+      
+      if (isAllowed) {
+        logger.debug(`✅ CORS: Origin allowed - ${origin}`);
         callback(null, true);
       } else {
+        logger.warn(`❌ CORS: Origin blocked - ${origin}`);
+        logger.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -100,6 +113,7 @@ async function bootstrap() {
       logger.log(`📚 Swagger API Documentation: /api`);
     }
     logger.log(`🌍 Environment: ${nodeEnv}`);
+    logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
     
     // Afficher les infos DB de manière sécurisée
     const pgHost = configService.get<string>('PGHOST');
@@ -114,6 +128,7 @@ async function bootstrap() {
     logger.log(`🚀 Application is running on: http://localhost:${port}`);
     logger.log(`📚 Swagger API Documentation: http://localhost:${port}/api`);
     logger.log(`🌍 Environment: ${nodeEnv}`);
+    logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
     
     // Afficher les infos DB en développement
     const pgHost = configService.get<string>('PGHOST');
