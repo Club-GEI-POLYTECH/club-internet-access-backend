@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirection - Club Internet Access</title>
+    <!-- Redirection automatique vers le portail externe -->
+    <meta http-equiv="refresh" content="0; url=https://wifi.clubgei.org/captive?mac=$(mac)&ip=$(ip)&orig=$(link-orig-esc)">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 10px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Club Internet Access</h1>
+        <p>Redirection vers le portail de connexion...</p>
+        <div class="spinner"></div>
+        <p style="font-size: 12px; margin-top: 20px;">
+            Si la redirection ne fonctionne pas, 
+            <a href="https://wifi.clubgei.org/captive?mac=$(mac)&ip=$(ip)&orig=$(link-orig-esc)" 
+               style="color: white; text-decoration: underline;">
+               cliquez ici
+            </a>
+        </p>
+    </div>
+    <script>
+        // Redirection de secours après 2 secondes
+        setTimeout(function() {
+            window.location.href = 'https://wifi.clubgei.org/captive?mac=$(mac)&ip=$(ip)&orig=$(link-orig-esc)';
+        }, 2000);
+    </script>
+</body>
+</html>
