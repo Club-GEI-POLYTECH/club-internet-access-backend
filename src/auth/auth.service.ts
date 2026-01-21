@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
@@ -59,10 +60,18 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    // L'inscription publique ne permet que le rôle 'student'
+    // Les rôles 'admin' et 'agent' doivent être créés par un administrateur
+    if (registerDto.role && registerDto.role !== UserRole.STUDENT) {
+      throw new BadRequestException('Seuls les étudiants peuvent s\'inscrire via l\'inscription publique');
+    }
+    
+    // usersService.create() hash automatiquement le mot de passe
+    // Pas besoin de le hasher ici
     const user = await this.usersService.create({
       ...registerDto,
-      password: hashedPassword,
+      // Forcer le rôle 'student' pour l'inscription publique
+      role: UserRole.STUDENT,
     });
 
     const { password, ...result } = user;

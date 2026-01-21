@@ -12,6 +12,15 @@ export class UsersService {
   ) {}
 
   async create(userData: Partial<User>): Promise<User> {
+    // Hasher le mot de passe si fourni (comme dans register)
+    if (userData.password) {
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      userData = {
+        ...userData,
+        password: hashedPassword,
+      };
+    }
+    
     const user = this.usersRepository.create(userData);
     return await this.usersRepository.save(user);
   }
@@ -36,6 +45,15 @@ export class UsersService {
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
+    // Hasher le mot de passe si fourni dans la mise à jour
+    if (userData.password) {
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      userData = {
+        ...userData,
+        password: hashedPassword,
+      };
+    }
+    
     await this.usersRepository.update(id, userData);
     return await this.findOne(id);
   }
