@@ -27,6 +27,11 @@ export class CreatePaymentDto {
   @IsString()
   wifiAccountId?: string;
 
+  @ApiPropertyOptional({ example: 'uuid', description: 'UUID du ticket associé (optionnel)' })
+  @IsOptional()
+  @IsString()
+  ticketId?: string;
+
   @ApiPropertyOptional({ example: 'Paiement étudiant', description: 'Notes optionnelles' })
   @IsOptional()
   @IsString()

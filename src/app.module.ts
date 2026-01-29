@@ -13,6 +13,8 @@ import { BandwidthModule } from './bandwidth/bandwidth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { NotificationsModule } from './notifications/notifications.module';
+import { KafkaModule } from './kafka/kafka.module';
+import { TicketsModule } from './tickets/tickets.module';
 import { databaseConfig } from './config/database.config';
 
 @Module({
@@ -36,6 +38,8 @@ import { databaseConfig } from './config/database.config';
     DashboardModule,
     BandwidthModule,
     NotificationsModule,
+    KafkaModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { WiFiAccount } from './wifi-account.entity';
 import { User } from './user.entity';
+import { Ticket } from './ticket.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -68,6 +70,12 @@ export class Payment {
 
   @Column({ type: 'text', nullable: true })
   notes: string;
+
+  @OneToOne(() => Ticket, (ticket) => ticket.payment, { nullable: true })
+  ticket: Ticket;
+
+  @Column({ nullable: true })
+  ticketId: string;
 
   @CreateDateColumn()
   createdAt: Date;

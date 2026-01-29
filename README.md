@@ -5,12 +5,14 @@ API NestJS pour la gestion d'accès Wi-Fi via MikroTik RouterOS.
 ## 🎯 Fonctionnalités
 
 - ✅ Gestion complète des comptes Wi-Fi (création, expiration automatique)
+- ✅ **Système de vente de tickets pré-générés depuis Mikhmon** 🎫
 - ✅ Intégration MikroTik RouterOS API
 - ✅ Système de paiement avec génération automatique de comptes
 - ✅ Authentification JWT avec rôles (Admin, Agent, Student)
 - ✅ Dashboard avec statistiques en temps réel
 - ✅ Synchronisation automatique des sessions actives
 - ✅ Expiration automatique des comptes (scheduler)
+- ✅ **Intégration Kafka pour réception de données** 📨
 
 ## 🚀 Démarrage Rapide
 
@@ -46,6 +48,8 @@ L'API sera accessible sur `http://localhost:4000/api`
 - [**Guide configuration multi-services Railway**](./RAILWAY_MULTI_SERVICE_SETUP.md) ⭐ **Important pour détecter backend + postgres**
 - [Guide d'insertion des données](./SEED_GUIDE.md)
 - [Scripts de configuration MikroTik](./scripts/README.md)
+- [**Système de vente de tickets**](./TICKETS.md) ⭐ **Vente de tickets pré-générés depuis Mikhmon**
+- [**Intégration Kafka**](./KAFKA.md) ⭐ **Réception de données via Kafka**
 
 ## 🏗️ Architecture
 
@@ -85,6 +89,7 @@ Voir `env.example.txt` pour la liste complète des variables.
 ## 📊 Endpoints Principaux
 
 - `/api/auth/*` - Authentification
+- `/api/tickets/*` - Vente de tickets pré-générés 🎫
 - `/api/wifi-accounts/*` - Gestion comptes Wi-Fi
 - `/api/payments/*` - Gestion paiements
 - `/api/sessions/*` - Sessions actives

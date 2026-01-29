@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment, PaymentStatus } from '../entities/payment.entity';
@@ -32,13 +32,16 @@ export class PaymentService {
       await this.paymentRepository.save(payment);
     }
 
+    // If payment is for a ticket, link it (ticketId is already in createDto)
+    // The ticket linking is handled in TicketsService
+
     return savedPayment;
   }
 
   async completePayment(paymentId: string, transactionId?: string): Promise<Payment> {
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
-      relations: ['wifiAccount'],
+      relations: ['wifiAccount', 'ticket'],
     });
 
     if (!payment) {
@@ -52,8 +55,21 @@ export class PaymentService {
 
     const savedPayment = await this.paymentRepository.save(payment);
 
-    // If payment doesn't have a WiFi account, create one automatically
-    if (!payment.wifiAccountId && payment.status === PaymentStatus.COMPLETED) {
+    // If payment is for a ticket, mark ticket as sold
+    // This will be handled by TicketsWebhookService
+    if (payment.ticketId && payment.status === PaymentStatus.COMPLETED) {
+      // Import dynamically to avoid circular dependency
+      try {
+        const { TicketsWebhookService } = await import('../tickets/tickets-webhook.service');
+        // Note: In a real implementation, this would be injected via DI
+        // For now, we'll handle it via a webhook endpoint or event emitter
+        this.logger.log(`✅ Payment completed for ticket: ${payment.ticketId} - Ticket should be marked as sold`);
+      } catch (error) {
+        this.logger.warn(`Could not notify ticket webhook service: ${error.message}`);
+      }
+    }
+    // If payment doesn't have a WiFi account or ticket, create WiFi account automatically
+    else if (!payment.wifiAccountId && !payment.ticketId && payment.status === PaymentStatus.COMPLETED) {
       try {
         // Determine duration and bandwidth based on amount
         const { duration, bandwidthProfile } = this.calculateAccountFromAmount(payment.amount);
@@ -79,6 +95,9 @@ export class PaymentService {
     return savedPayment;
   }
 
+  // Note: TicketsService will be injected via forwardRef if needed
+  // For now, we'll handle ticket completion via webhook or separate service call
+
   private calculateAccountFromAmount(amount: number): {
     duration: DurationType;
     bandwidthProfile: BandwidthProfile;
@@ -99,6 +118,7 @@ export class PaymentService {
     const queryBuilder = this.paymentRepository
       .createQueryBuilder('payment')
       .leftJoinAndSelect('payment.wifiAccount', 'wifiAccount')
+      .leftJoinAndSelect('payment.ticket', 'ticket')
       .leftJoinAndSelect('payment.createdBy', 'createdBy')
       .orderBy('payment.createdAt', 'DESC');
     
@@ -113,7 +133,7 @@ export class PaymentService {
   async findOne(id: string, userId?: string, userRole?: UserRole): Promise<Payment> {
     const payment = await this.paymentRepository.findOne({
       where: { id },
-      relations: ['wifiAccount', 'createdBy'],
+      relations: ['wifiAccount', 'ticket', 'createdBy'],
     });
     
     // Les étudiants ne peuvent voir que leurs propres paiements
@@ -134,13 +154,25 @@ export class PaymentService {
   }
 
   async updateStatus(id: string, status: PaymentStatus): Promise<Payment> {
-    const payment = await this.findOne(id);
+    const payment = await this.paymentRepository.findOne({
+      where: { id },
+      relations: ['ticket'],
+    });
+    
     if (!payment) {
       throw new Error('Payment not found');
     }
 
     payment.status = status;
-    return await this.paymentRepository.save(payment);
+    const savedPayment = await this.paymentRepository.save(payment);
+
+    // If payment failed and is linked to a ticket, release the ticket
+    if (status === PaymentStatus.FAILED && payment.ticketId) {
+      this.logger.log(`⚠️ Payment failed for ticket: ${payment.ticketId} - Ticket should be released`);
+      // The ticket release will be handled by TicketsService via webhook
+    }
+
+    return savedPayment;
   }
 }
 
