@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,20 +9,30 @@ import { UserRole } from '../entities/user.entity';
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.AGENT)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
+  @Get('my-stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mes statistiques', description: 'Comptes Wi-Fi et paiements de l\'utilisateur connecté (tous rôles: Admin, Agent, Étudiant)' })
+  @ApiResponse({ status: 200, description: 'wifiAccountsCount, paymentsCount' })
+  async getMyStats(@Request() req: { user: { userId: string } }) {
+    return await this.dashboardService.getMyStats(req.user.userId);
+  }
+
   @Get('stats')
-  @ApiOperation({ summary: 'Statistiques du dashboard', description: 'Retourne les statistiques globales du dashboard (ADMIN/AGENT uniquement)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.AGENT)
+  @ApiOperation({ summary: 'Statistiques globales du dashboard', description: 'Statistiques globales (comptes, paiements, sessions, tickets) - ADMIN/AGENT uniquement' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {
     return await this.dashboardService.getDashboardStats();
   }
 
   @Get('charts')
-  @ApiOperation({ summary: 'Données pour graphiques', description: 'Retourne les données pour les graphiques du dashboard' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.AGENT)
+  @ApiOperation({ summary: 'Données pour graphiques', description: 'Données pour graphiques du dashboard - ADMIN/AGENT uniquement' })
   @ApiQuery({ name: 'days', required: false, description: 'Nombre de jours (défaut: 7)', example: 30 })
   @ApiResponse({ status: 200, description: 'Données récupérées avec succès' })
   async getCharts(@Query('days') days?: string) {

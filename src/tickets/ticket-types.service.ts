@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TicketType } from '../entities/ticket-type.entity';
@@ -47,6 +47,22 @@ export class TicketTypesService {
     return await this.ticketTypesRepository.findOne({
       where: { id },
     });
+  }
+
+  async findOneWithCount(id: string): Promise<TicketType & { availableCount: number }> {
+    const type = await this.ticketTypesRepository.findOne({
+      where: { id },
+    });
+    if (!type) {
+      throw new NotFoundException('Ticket type not found');
+    }
+    const availableCount = await this.ticketsRepository.count({
+      where: {
+        ticketTypeId: id,
+        status: TicketStatus.AVAILABLE,
+      },
+    });
+    return { ...type, availableCount };
   }
 
   async findByProfile(profile: string): Promise<TicketType | null> {

@@ -67,6 +67,10 @@ export class SessionsService {
 
       return syncedCount;
     } catch (error) {
+      if (error?.message?.includes('Not connected to MikroTik')) {
+        this.logger.warn('⚠️ MikroTik not reachable (e.g. backend in cloud) - skipping session sync');
+        return 0;
+      }
       this.logger.error(`❌ Failed to sync sessions: ${error.message}`);
       throw error;
     }

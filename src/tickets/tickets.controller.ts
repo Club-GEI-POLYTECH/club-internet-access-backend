@@ -70,10 +70,18 @@ export class TicketsController {
   }
 
   @Get('types')
-  @ApiOperation({ summary: 'Liste tous les types de tickets avec leur nombre disponible' })
-  @ApiResponse({ status: 200, description: 'Liste des types de tickets' })
+  @ApiOperation({ summary: 'Liste tous les types de tickets avec leur nombre disponible (ex: page /home)' })
+  @ApiResponse({ status: 200, description: 'Liste des types de tickets (name, price, timeLimit, dataLimit, availableCount)' })
   async getTicketTypes() {
     return await this.ticketTypesService.findAllWithCounts();
+  }
+
+  @Get('types/:id')
+  @ApiOperation({ summary: 'Détail d\'un type de ticket par ID' })
+  @ApiResponse({ status: 200, description: 'Type de ticket avec availableCount' })
+  @ApiResponse({ status: 404, description: 'Type non trouvé' })
+  async getTicketTypeById(@Param('id') id: string) {
+    return await this.ticketTypesService.findOneWithCount(id);
   }
 
   @Get('type/:typeId')
@@ -198,7 +206,7 @@ export class TicketsController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(text\/csv|application\/vnd.ms-excel)/ }),
+          new FileTypeValidator({ fileType: /(text\/csv|application\/vnd\.ms-excel|text\/plain)/ }),
         ],
       }),
     )

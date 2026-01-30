@@ -10,15 +10,15 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // Enable CORS: production (wifi.clubgei-polytech.org) + local (localhost:3000)
-  const defaultOrigins = [
-    'https://wifi.clubgei-polytech.org',
-    'http://localhost:3000',
-  ];
-  const rawOrigins = process.env.FRONTEND_URL
+  // CORS: site production + local + FRONTEND_URL (Railway peut n'avoir qu'une URL)
+  const productionOrigin = 'https://wifi.clubgei-polytech.org';
+  const defaultOrigins = [productionOrigin, 'http://localhost:3000'];
+  const fromEnv = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(Boolean)
-    : defaultOrigins;
-  // Normaliser (sans slash final) pour comparaison
+    : [];
+  const rawOrigins = [
+    ...new Set([...defaultOrigins, ...fromEnv.map(url => url.replace(/\/$/, ''))]),
+  ];
   const allowedOrigins = rawOrigins.map(url => url.replace(/\/$/, ''));
   
   logger.log('🌐 CORS Configuration:');

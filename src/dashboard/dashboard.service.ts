@@ -5,6 +5,7 @@ import { WiFiAccount } from '../entities/wifi-account.entity';
 import { Payment, PaymentStatus } from '../entities/payment.entity';
 import { Session } from '../entities/session.entity';
 import { User } from '../entities/user.entity';
+import { Ticket, TicketStatus } from '../entities/ticket.entity';
 import { MikroTikService } from '../mikrotik/mikrotik.service';
 
 @Injectable()
@@ -18,6 +19,8 @@ export class DashboardService {
     private sessionsRepository: Repository<Session>,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @InjectRepository(Ticket)
+    private ticketsRepository: Repository<Ticket>,
     private mikrotikService: MikroTikService,
   ) {}
 
@@ -35,6 +38,10 @@ export class DashboardService {
       activeSessions,
       totalUsers,
       activeUsers,
+      ticketsTotal,
+      ticketsAvailable,
+      ticketsSold,
+      ticketsRevenue,
     ] = await Promise.all([
       this.wifiAccountsRepository.count(),
       this.wifiAccountsRepository.count({ where: { isActive: true, isExpired: false } }),
@@ -52,6 +59,14 @@ export class DashboardService {
       this.sessionsRepository.count({ where: { isActive: true } }),
       this.usersRepository.count(),
       this.usersRepository.count({ where: { isActive: true } }),
+      this.ticketsRepository.count(),
+      this.ticketsRepository.count({ where: { status: TicketStatus.AVAILABLE } }),
+      this.ticketsRepository.count({ where: { status: TicketStatus.SOLD } }),
+      this.ticketsRepository
+        .createQueryBuilder('ticket')
+        .select('SUM(ticket.price)', 'total')
+        .where('ticket.status = :status', { status: TicketStatus.SOLD })
+        .getRawOne(),
     ]);
 
     // Get MikroTik active users separately to handle errors gracefully
@@ -103,10 +118,27 @@ export class DashboardService {
         total: totalUsers,
         active: activeUsers,
       },
+      tickets: {
+        total: ticketsTotal,
+        available: ticketsAvailable,
+        sold: ticketsSold,
+        revenue: parseFloat(ticketsRevenue?.total || '0'),
+      },
       recent: {
         accounts: recentAccounts,
         payments: recentPayments,
       },
+    };
+  }
+
+  async getMyStats(userId: string) {
+    const [wifiAccountsCount, paymentsCount] = await Promise.all([
+      this.wifiAccountsRepository.count({ where: { createdById: userId } }),
+      this.paymentsRepository.count({ where: { createdById: userId } }),
+    ]);
+    return {
+      wifiAccountsCount,
+      paymentsCount,
     };
   }
 
