@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsUUID, IsEnum, IsString, IsOptional } from 'class-validator';
 import { PaymentStatus } from '../../entities/payment.entity';
 

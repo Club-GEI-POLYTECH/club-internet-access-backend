@@ -35,12 +35,17 @@ export const databaseConfig = (
     logger.log(`   User: ${pgUser}`);
     logger.log(`   NODE_ENV: ${configService.get<string>('NODE_ENV')}, isProduction: ${isProduction}`);
     
-    // Railway nécessite SSL en production
-    const sslConfig = isProduction || pgHost.includes('railway.app') || pgHost.includes('render.com')
-      ? { rejectUnauthorized: false }
-      : false;
+    // SSL uniquement pour les hébergeurs cloud (Railway, Render, etc.)
+    // Désactivé pour postgres/localhost (Docker Compose local)
+    const isCloudHost =
+      pgHost.includes('railway.app') ||
+      pgHost.includes('render.com') ||
+      pgHost.includes('neon.tech') ||
+      pgHost.includes('supabase.co');
+    const sslConfig =
+      isCloudHost ? { rejectUnauthorized: false } : false;
     
-    logger.log(`   SSL enabled: ${!!sslConfig}`);
+    logger.log(`   SSL enabled: ${!!sslConfig} (host: ${pgHost})`);
     
     return {
       type: 'postgres',

@@ -1,13 +1,14 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   postgres:
     image: postgres:15-alpine
     container_name: internet_access_postgres_prod
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      # Valeurs par défaut si .env absent (évite "POSTGRES_PASSWORD not specified")
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-internet_access}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -15,7 +16,7 @@ services:
     networks:
       - internet_access_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,28 +31,25 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      # Variables PG* (Railway - priorité 1)
-      # Railway injecte automatiquement ces variables depuis le service PostgreSQL
-      # Si le service PostgreSQL s'appelle "postgres", Railway utilise ${{Postgres.PGHOST}}
-      # Note: Docker-compose ne peut pas utiliser ${{...}}, mais Railway les injecte automatiquement
-      PGHOST: ${PGHOST}
-      PGPORT: ${PGPORT}
-      PGUSER: ${PGUSER}
-      PGPASSWORD: ${PGPASSWORD}
-      PGDATABASE: ${PGDATABASE}
+      # Variables PG* (Railway les injecte ; en local, fallback sur postgres)
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGUSER: ${PGUSER:-${DB_USER:-postgres}}
+      PGPASSWORD: ${PGPASSWORD:-${DB_PASSWORD:-postgres}}
+      PGDATABASE: ${PGDATABASE:-${DB_NAME:-internet_access}}
       # Variables DB_* (fallback pour local/Docker)
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
-      DB_USERNAME: ${DB_USERNAME:-${DB_USER}}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE: ${DB_DATABASE:-${DB_NAME}}
-      # Autres variables
-      JWT_SECRET: ${JWT_SECRET}
-      MIKROTIK_HOST: ${MIKROTIK_HOST}
+      DB_USERNAME: ${DB_USERNAME:-${DB_USER:-postgres}}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_DATABASE: ${DB_DATABASE:-${DB_NAME:-internet_access}}
+      # Autres variables (valeurs par défaut pour Docker local si .env absent)
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-secret}
+      MIKROTIK_HOST: ${MIKROTIK_HOST:-192.168.88.1}
       MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
-      MIKROTIK_USER: ${MIKROTIK_USER}
-      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
-      FRONTEND_URL: ${FRONTEND_URL}
+      MIKROTIK_USER: ${MIKROTIK_USER:-admin}
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
