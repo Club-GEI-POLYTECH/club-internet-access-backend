@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -10,6 +10,8 @@ import { UserRole } from '../entities/user.entity';
 @ApiBearerAuth('JWT-auth')
 @Controller('dashboard')
 export class DashboardController {
+  private readonly logger = new Logger(DashboardController.name);
+
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('my-stats')
@@ -17,6 +19,7 @@ export class DashboardController {
   @ApiOperation({ summary: 'Mes statistiques', description: 'Comptes Wi-Fi et paiements de l\'utilisateur connecté (tous rôles: Admin, Agent, Étudiant)' })
   @ApiResponse({ status: 200, description: 'wifiAccountsCount, paymentsCount' })
   async getMyStats(@Request() req: { user: { userId: string } }) {
+    this.logger.log(`GET /dashboard/my-stats userId=${req.user.userId}`);
     return await this.dashboardService.getMyStats(req.user.userId);
   }
 
@@ -26,6 +29,7 @@ export class DashboardController {
   @ApiOperation({ summary: 'Statistiques globales du dashboard', description: 'Statistiques globales (comptes, paiements, sessions, tickets) - ADMIN/AGENT uniquement' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {
+    this.logger.log('GET /dashboard/stats');
     return await this.dashboardService.getDashboardStats();
   }
 
@@ -36,6 +40,7 @@ export class DashboardController {
   @ApiQuery({ name: 'days', required: false, description: 'Nombre de jours (défaut: 7)', example: 30 })
   @ApiResponse({ status: 200, description: 'Données récupérées avec succès' })
   async getCharts(@Query('days') days?: string) {
+    this.logger.log(`GET /dashboard/charts days=${days ?? '7'}`);
     const daysNumber = days ? parseInt(days) : 7;
     return await this.dashboardService.getChartData(daysNumber);
   }
