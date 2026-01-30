@@ -49,7 +49,7 @@ services:
       MIKROTIK_PORT: ${MIKROTIK_PORT:-8728}
       MIKROTIK_USER: ${MIKROTIK_USER:-admin}
       MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD:-}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000,https://wifi.clubgei-polytech.org}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}

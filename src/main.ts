@@ -10,10 +10,14 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // Enable CORS for frontend
-  const allowedOrigins = process.env.FRONTEND_URL 
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-    : ['http://localhost:3000'];
+  // Enable CORS: production (wifi.clubgei-polytech.org) + local (localhost:3000)
+  const defaultOrigins = [
+    'https://wifi.clubgei-polytech.org',
+    'http://localhost:3000',
+  ];
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(Boolean)
+    : defaultOrigins;
   
   // Logger les origines CORS autorisées
   logger.log('🌐 CORS Configuration:');
