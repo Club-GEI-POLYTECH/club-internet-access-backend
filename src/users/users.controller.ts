@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,12 +9,15 @@ import { User } from '../entities/user.entity';
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @ApiOperation({ summary: 'Lister tous les utilisateurs', description: 'Retourne la liste de tous les utilisateurs du système' })
   @ApiResponse({ status: 200, description: 'Liste récupérée avec succès' })
   async findAll() {
+    this.logger.log('GET /users');
     return await this.usersService.findAll();
   }
 
@@ -24,6 +27,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Utilisateur récupéré avec succès' })
   @ApiResponse({ status: 404, description: 'Utilisateur non trouvé' })
   async findOne(@Param('id') id: string) {
+    this.logger.log(`GET /users/${id}`);
     return await this.usersService.findOne(id);
   }
 
@@ -33,6 +37,7 @@ export class UsersController {
   @ApiResponse({ status: 201, description: 'Utilisateur créé avec succès' })
   @ApiResponse({ status: 400, description: 'Erreur de validation' })
   async create(@Body() userData: Partial<User>) {
+    this.logger.log(`POST /users email=${userData?.email}`);
     return await this.usersService.create(userData);
   }
 
@@ -43,6 +48,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Utilisateur mis à jour avec succès' })
   @ApiResponse({ status: 404, description: 'Utilisateur non trouvé' })
   async update(@Param('id') id: string, @Body() userData: Partial<User>) {
+    this.logger.log(`PUT /users/${id}`);
     return await this.usersService.update(id, userData);
   }
 
@@ -52,6 +58,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Utilisateur supprimé avec succès' })
   @ApiResponse({ status: 404, description: 'Utilisateur non trouvé' })
   async remove(@Param('id') id: string) {
+    this.logger.log(`DELETE /users/${id}`);
     await this.usersService.remove(id);
     return { message: 'User deleted successfully' };
   }

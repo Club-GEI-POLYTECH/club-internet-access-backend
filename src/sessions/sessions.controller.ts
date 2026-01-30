@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { SessionsService } from './sessions.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,6 +11,8 @@ import { UserRole } from '../entities/user.entity';
 @Controller('sessions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SessionsController {
+  private readonly logger = new Logger(SessionsController.name);
+
   constructor(private readonly sessionsService: SessionsService) {}
 
   @Get()
@@ -19,6 +21,7 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: 'Liste des sessions récupérée avec succès' })
   @ApiResponse({ status: 403, description: 'Accès refusé (rôle insuffisant)' })
   async findAll() {
+    this.logger.log('GET /sessions');
     return await this.sessionsService.findAll();
   }
 
@@ -27,6 +30,7 @@ export class SessionsController {
   @ApiOperation({ summary: 'Lister les sessions actives', description: 'Retourne uniquement les sessions actives (ADMIN/AGENT uniquement)' })
   @ApiResponse({ status: 200, description: 'Liste des sessions actives récupérée avec succès' })
   async findActive() {
+    this.logger.log('GET /sessions/active');
     return await this.sessionsService.findActive();
   }
 
@@ -35,6 +39,7 @@ export class SessionsController {
   @ApiOperation({ summary: 'Statistiques des sessions', description: 'Retourne les statistiques des sessions (ADMIN/AGENT uniquement)' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStatistics() {
+    this.logger.log('GET /sessions/statistics');
     return await this.sessionsService.getStatistics();
   }
 
@@ -44,6 +49,7 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: 'Sessions synchronisées avec succès' })
   @ApiResponse({ status: 403, description: 'Accès refusé (ADMIN uniquement)' })
   async syncSessions() {
+    this.logger.log('POST /sessions/sync');
     const count = await this.sessionsService.syncActiveSessions();
     return { message: `Synced ${count} active session(s)` };
   }
@@ -54,6 +60,7 @@ export class SessionsController {
   @ApiParam({ name: 'wifiAccountId', description: 'UUID du compte Wi-Fi' })
   @ApiResponse({ status: 200, description: 'Sessions récupérées avec succès' })
   async findByWiFiAccount(@Param('wifiAccountId') wifiAccountId: string) {
+    this.logger.log(`GET /sessions/wifi-account/${wifiAccountId}`);
     return await this.sessionsService.findByWiFiAccount(wifiAccountId);
   }
 
@@ -64,6 +71,7 @@ export class SessionsController {
   @ApiResponse({ status: 200, description: 'Session récupérée avec succès' })
   @ApiResponse({ status: 404, description: 'Session non trouvée' })
   async findOne(@Param('id') id: string) {
+    this.logger.log(`GET /sessions/${id}`);
     return await this.sessionsService.findOne(id);
   }
 }

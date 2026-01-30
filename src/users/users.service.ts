@@ -31,6 +31,7 @@ export class UsersService {
   }
 
   async findAll(): Promise<User[]> {
+    this.logger.log('findAll users');
     return await this.usersRepository.find({
       relations: ['wifiAccounts', 'payments'],
     });

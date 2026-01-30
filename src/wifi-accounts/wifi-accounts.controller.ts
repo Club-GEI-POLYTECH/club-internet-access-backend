@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   Request,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { WiFiAccountsService } from './wifi-accounts.service';
@@ -21,6 +22,8 @@ import { UserRole } from '../entities/user.entity';
 @Controller('wifi-accounts')
 @UseGuards(JwtAuthGuard)
 export class WiFiAccountsController {
+  private readonly logger = new Logger(WiFiAccountsController.name);
+
   constructor(private readonly wifiAccountsService: WiFiAccountsService) {}
 
   @Post()
@@ -33,6 +36,7 @@ export class WiFiAccountsController {
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Accès refusé' })
   async create(@Body() createDto: CreateWiFiAccountDto, @Request() req) {
+    this.logger.log(`POST /wifi-accounts userId=${req.user?.userId}`);
     return await this.wifiAccountsService.create(createDto, req.user.userId);
   }
 
@@ -41,6 +45,7 @@ export class WiFiAccountsController {
   @ApiResponse({ status: 200, description: 'Liste des comptes Wi-Fi récupérée avec succès' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async findAll(@Request() req) {
+    this.logger.log(`GET /wifi-accounts userId=${req.user?.userId} role=${req.user?.role}`);
     return await this.wifiAccountsService.findAll(req.user?.userId, req.user?.role);
   }
 
@@ -49,6 +54,7 @@ export class WiFiAccountsController {
   @ApiResponse({ status: 200, description: 'Liste des comptes actifs récupérée avec succès' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async getActive(@Request() req) {
+    this.logger.log(`GET /wifi-accounts/active userId=${req.user?.userId}`);
     return await this.wifiAccountsService.getActiveAccounts(req.user?.userId, req.user?.role);
   }
 
@@ -59,6 +65,7 @@ export class WiFiAccountsController {
   @ApiResponse({ status: 404, description: 'Compte Wi-Fi non trouvé' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async findOne(@Param('id') id: string, @Request() req) {
+    this.logger.log(`GET /wifi-accounts/${id}`);
     return await this.wifiAccountsService.findOne(id, req.user?.userId, req.user?.role);
   }
 
@@ -68,6 +75,7 @@ export class WiFiAccountsController {
   @ApiResponse({ status: 200, description: 'Compte Wi-Fi supprimé avec succès' })
   @ApiResponse({ status: 404, description: 'Compte Wi-Fi non trouvé' })
   async delete(@Param('id') id: string) {
+    this.logger.log(`DELETE /wifi-accounts/${id}`);
     await this.wifiAccountsService.delete(id);
     return { message: 'WiFi account deleted successfully' };
   }

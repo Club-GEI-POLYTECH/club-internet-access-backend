@@ -131,6 +131,7 @@ export class WiFiAccountsService {
   }
 
   async findOne(id: string, userId?: string, userRole?: UserRole): Promise<WiFiAccount> {
+    this.logger.log(`findOne wifi account id=${id}`);
     const account = await this.wifiAccountsRepository.findOne({
       where: { id },
       relations: ['createdBy', 'payments', 'sessions'],
@@ -172,6 +173,7 @@ export class WiFiAccountsService {
   }
 
   async expireAccounts(): Promise<number> {
+    this.logger.log('expireAccounts start');
     const now = new Date();
     const expiredAccounts = await this.wifiAccountsRepository.find({
       where: {
@@ -194,10 +196,12 @@ export class WiFiAccountsService {
       }
     }
 
+    this.logger.log(`expireAccounts done count=${expiredAccounts.length}`);
     return expiredAccounts.length;
   }
 
   async getActiveAccounts(userId?: string, userRole?: UserRole): Promise<WiFiAccount[]> {
+    this.logger.log(`getActiveAccounts userId=${userId ?? 'all'} role=${userRole ?? 'all'}`);
     const where: any = {
       isActive: true,
       isExpired: false,

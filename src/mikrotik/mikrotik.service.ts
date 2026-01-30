@@ -90,6 +90,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Créer un utilisateur hotspot
    */
   async createHotspotUser(userData: HotspotUser): Promise<any> {
+    this.logger.log(`createHotspotUser name=${userData.name}`);
     this.ensureConnected();
 
     try {
@@ -118,6 +119,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Supprimer un utilisateur hotspot
    */
   async deleteHotspotUser(username: string): Promise<void> {
+    this.logger.log(`deleteHotspotUser username=${username}`);
     this.ensureConnected();
 
     try {
@@ -139,6 +141,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Obtenir un utilisateur hotspot
    */
   async getHotspotUser(username: string): Promise<any> {
+    this.logger.log(`getHotspotUser username=${username}`);
     this.ensureConnected();
 
     try {
@@ -176,6 +179,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Obtenir les utilisateurs actifs (connectés)
    */
   async getActiveUsers(): Promise<ActiveUser[]> {
+    this.logger.log('getActiveUsers');
     this.ensureConnected();
 
     try {
@@ -201,6 +205,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Déconnecter un utilisateur actif
    */
   async disconnectUser(sessionId: string): Promise<void> {
+    this.logger.log(`disconnectUser sessionId=${sessionId}`);
     this.ensureConnected();
 
     try {
@@ -217,6 +222,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Désactiver un utilisateur
    */
   async disableUser(username: string): Promise<void> {
+    this.logger.log(`disableUser username=${username}`);
     this.ensureConnected();
 
     try {
@@ -238,6 +244,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Activer un utilisateur
    */
   async enableUser(username: string): Promise<void> {
+    this.logger.log(`enableUser username=${username}`);
     this.ensureConnected();
 
     try {
@@ -259,6 +266,7 @@ export class MikroTikService implements OnModuleInit, OnModuleDestroy {
    * Vérifier la connexion
    */
   async checkConnection(): Promise<boolean> {
+    this.logger.log('checkConnection');
     try {
       if (!this.connected) {
         await this.connect();

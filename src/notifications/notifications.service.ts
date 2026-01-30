@@ -27,6 +27,7 @@ export class NotificationsService {
     firstName: string,
     resetUrl: string,
   ): Promise<void> {
+    this.logger.log(`sendPasswordResetEmail to=${email}`);
     const fromEmail = this.configService.get<string>('SMTP_FROM', 'noreply@unikin.cd');
     const appName = this.configService.get<string>('APP_NAME', 'Club Internet Access UNIKIN');
 

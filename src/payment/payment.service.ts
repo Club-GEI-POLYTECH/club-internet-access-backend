@@ -151,6 +151,7 @@ export class PaymentService {
   }
 
   async findByTransactionId(transactionId: string): Promise<Payment> {
+    this.logger.log(`findByTransactionId transactionId=${transactionId}`);
     return await this.paymentRepository.findOne({
       where: { transactionId },
       relations: ['wifiAccount', 'createdBy'],

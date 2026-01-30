@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -13,6 +13,8 @@ import { PaymentStatus } from '../entities/payment.entity';
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post()
@@ -21,6 +23,7 @@ export class PaymentController {
   @ApiResponse({ status: 201, description: 'Paiement créé avec succès' })
   @ApiResponse({ status: 400, description: 'Erreur de validation' })
   async create(@Body() createDto: CreatePaymentDto, @Request() req) {
+    this.logger.log(`POST /payments userId=${req.user?.userId}`);
     return await this.paymentService.create(createDto, req.user.userId);
   }
 
@@ -31,6 +34,7 @@ export class PaymentController {
   @ApiResponse({ status: 200, description: 'Paiement complété avec succès' })
   @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
   async completePayment(@Param('id') id: string, @Body() body: { transactionId?: string }) {
+    this.logger.log(`POST /payments/${id}/complete transactionId=${body?.transactionId ?? 'none'}`);
     return await this.paymentService.completePayment(id, body.transactionId);
   }
 
@@ -44,6 +48,7 @@ export class PaymentController {
     @Param('id') id: string,
     @Body() body: { status: PaymentStatus },
   ) {
+    this.logger.log(`PUT /payments/${id}/status status=${body.status}`);
     return await this.paymentService.updateStatus(id, body.status);
   }
 
@@ -52,6 +57,7 @@ export class PaymentController {
   @ApiResponse({ status: 200, description: 'Liste des paiements récupérée avec succès' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async findAll(@Request() req) {
+    this.logger.log(`GET /payments userId=${req.user?.userId} role=${req.user?.role}`);
     return await this.paymentService.findAll(req.user?.userId, req.user?.role);
   }
 
@@ -62,6 +68,7 @@ export class PaymentController {
   @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async findOne(@Param('id') id: string, @Request() req) {
+    this.logger.log(`GET /payments/${id}`);
     return await this.paymentService.findOne(id, req.user?.userId, req.user?.role);
   }
 
@@ -71,6 +78,7 @@ export class PaymentController {
   @ApiResponse({ status: 200, description: 'Paiement trouvé avec succès' })
   @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
   async findByTransactionId(@Param('transactionId') transactionId: string) {
+    this.logger.log(`GET /payments/transaction/${transactionId}`);
     return await this.paymentService.findByTransactionId(transactionId);
   }
 }

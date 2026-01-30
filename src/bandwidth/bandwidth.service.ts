@@ -69,6 +69,7 @@ export class BandwidthService {
    * Obtenir l'utilisation de bande passante en temps réel depuis MikroTik
    */
   async getRealTimeUsage(): Promise<BandwidthUsage[]> {
+    this.logger.log('getRealTimeUsage');
     try {
       const activeUsers = await this.mikrotikService.getActiveUsers();
       const now = Date.now();
@@ -133,6 +134,7 @@ export class BandwidthService {
    * Obtenir les statistiques globales de bande passante
    */
   async getBandwidthStats(): Promise<BandwidthStats> {
+    this.logger.log('getBandwidthStats');
     try {
       const activeUsers = await this.mikrotikService.getActiveUsers();
       
@@ -192,6 +194,7 @@ export class BandwidthService {
    * Obtenir l'utilisation de bande passante pour un utilisateur spécifique
    */
   async getUserBandwidth(username: string): Promise<BandwidthUsage | null> {
+    this.logger.log(`getUserBandwidth username=${username}`);
     try {
       const activeUsers = await this.mikrotikService.getActiveUsers();
       const user = activeUsers.find((u) => u.user === username);
@@ -223,6 +226,7 @@ export class BandwidthService {
    * Obtenir l'historique de bande passante depuis la base de données
    */
   async getHistoricalUsage(days: number = 7): Promise<any[]> {
+    this.logger.log(`getHistoricalUsage days=${days}`);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 

@@ -98,7 +98,9 @@ async function bootstrap() {
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
+      docExpansion: 'list',
     },
+    customSiteTitle: 'Club Internet Access API',
   });
 
   const port = configService.get<number>('PORT') || 3000;

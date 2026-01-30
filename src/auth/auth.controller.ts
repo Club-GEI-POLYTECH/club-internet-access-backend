@@ -22,6 +22,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Erreur de validation' })
   @ApiResponse({ status: 409, description: 'Email déjà utilisé' })
   async register(@Body() registerDto: RegisterDto) {
+    this.logger.log(`POST /auth/register email=${registerDto.email}`);
     return this.authService.register(registerDto);
   }
 
@@ -63,6 +64,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Profil utilisateur récupéré avec succès' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   async getProfile(@Request() req) {
+    this.logger.log(`GET /auth/profile userId=${req.user?.userId}`);
     const user = await this.authService.getUserProfile(req.user.userId);
     return {
       id: user.id,

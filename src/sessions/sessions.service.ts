@@ -85,6 +85,7 @@ export class SessionsService {
   }
 
   async findAll(): Promise<Session[]> {
+    this.logger.log('findAll sessions');
     return await this.sessionsRepository.find({
       relations: ['wifiAccount'],
       order: { createdAt: 'DESC' },
@@ -92,6 +93,7 @@ export class SessionsService {
   }
 
   async findActive(): Promise<Session[]> {
+    this.logger.log('findActive sessions');
     return await this.sessionsRepository.find({
       where: { isActive: true },
       relations: ['wifiAccount'],
@@ -100,6 +102,7 @@ export class SessionsService {
   }
 
   async findOne(id: string): Promise<Session> {
+    this.logger.log(`findOne session id=${id}`);
     return await this.sessionsRepository.findOne({
       where: { id },
       relations: ['wifiAccount'],
@@ -107,6 +110,7 @@ export class SessionsService {
   }
 
   async findByWiFiAccount(wifiAccountId: string): Promise<Session[]> {
+    this.logger.log(`findByWiFiAccount wifiAccountId=${wifiAccountId}`);
     return await this.sessionsRepository.find({
       where: { wifiAccountId },
       relations: ['wifiAccount'],
@@ -115,6 +119,7 @@ export class SessionsService {
   }
 
   async getStatistics() {
+    this.logger.log('getStatistics sessions');
     const totalSessions = await this.sessionsRepository.count();
     const activeSessions = await this.sessionsRepository.count({
       where: { isActive: true },
