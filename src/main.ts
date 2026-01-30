@@ -15,33 +15,35 @@ async function bootstrap() {
     'https://wifi.clubgei-polytech.org',
     'http://localhost:3000',
   ];
-  const allowedOrigins = process.env.FRONTEND_URL
+  const rawOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(Boolean)
     : defaultOrigins;
+  // Normaliser (sans slash final) pour comparaison
+  const allowedOrigins = rawOrigins.map(url => url.replace(/\/$/, ''));
   
-  // Logger les origines CORS autorisées
   logger.log('🌐 CORS Configuration:');
   logger.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
   logger.log(`   Total origins: ${allowedOrigins.length}`);
   
   app.enableCors({
     origin: (origin, callback) => {
-      // Permettre les requêtes sans origine (mobile apps, Postman, etc.)
       if (!origin) {
-        logger.debug('✅ CORS: Request without origin allowed (mobile app, Postman, etc.)');
         return callback(null, true);
       }
-      
-      // Vérifier si l'origine est autorisée
-      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
-      
+      const originNormalized = origin.replace(/\/$/, '');
+      const isInList =
+        allowedOrigins.includes(originNormalized) ||
+        allowedOrigins.some(allowed => originNormalized === allowed || originNormalized.startsWith(allowed + '/'));
+      const isRailwayOrigin =
+        configService.get('NODE_ENV') === 'production' &&
+        (originNormalized.includes('.railway.app') || originNormalized.includes('.up.railway.app'));
+      const isAllowed = isInList || isRailwayOrigin;
+
       if (isAllowed) {
-        logger.debug(`✅ CORS: Origin allowed - ${origin}`);
         callback(null, true);
       } else {
-        logger.warn(`❌ CORS: Origin blocked - ${origin}`);
-        logger.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
-        callback(new Error('Not allowed by CORS'));
+        logger.warn(`❌ CORS: Origin blocked - ${origin} (allowed: ${allowedOrigins.join(', ')})`);
+        callback(null, false);
       }
     },
     credentials: true,
