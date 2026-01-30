@@ -17,7 +17,7 @@ export class SessionsScheduler {
         this.logger.log(`✅ Synced ${syncedCount} active session(s)`);
       }
     } catch (error) {
-      this.logger.error(`❌ Error syncing sessions: ${error.message}`);
+      this.logger.warn(`⚠️ Session sync skipped or failed: ${error.message}`);
     }
   }
 }
