@@ -71,7 +71,10 @@ export class TicketsAdminController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: /(text\/csv|application\/vnd\.ms-excel|text\/plain)/ }),
+          new FileTypeValidator({
+            fileType: /(text\/csv|application\/vnd\.ms-excel|text\/plain|application\/csv)/i,
+            fallbackToMimetype: true,
+          }),
         ],
       }),
     )
