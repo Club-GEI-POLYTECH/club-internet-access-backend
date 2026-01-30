@@ -18,6 +18,7 @@ export class PaymentService {
   ) {}
 
   async create(createDto: CreatePaymentDto, createdById?: string): Promise<Payment> {
+    this.logger.log(`create payment amount=${createDto.amount} method=${createDto.method} wifiAccountId=${createDto.wifiAccountId ?? 'none'} ticketId=${(createDto as any).ticketId ?? 'none'}`);
     const payment = this.paymentRepository.create({
       ...createDto,
       status: PaymentStatus.PENDING,
@@ -25,6 +26,7 @@ export class PaymentService {
     });
 
     const savedPayment = await this.paymentRepository.save(payment);
+    this.logger.log(`payment created id=${savedPayment.id}`);
 
     // If payment is for a WiFi account, link it
     if (createDto.wifiAccountId) {
@@ -39,6 +41,7 @@ export class PaymentService {
   }
 
   async completePayment(paymentId: string, transactionId?: string): Promise<Payment> {
+    this.logger.log(`completePayment paymentId=${paymentId} transactionId=${transactionId ?? 'none'}`);
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
       relations: ['wifiAccount', 'ticket'],
@@ -115,6 +118,7 @@ export class PaymentService {
   }
 
   async findAll(userId?: string, userRole?: UserRole): Promise<Payment[]> {
+    this.logger.log(`findAll payments userId=${userId ?? 'all'} role=${userRole ?? 'all'}`);
     const queryBuilder = this.paymentRepository
       .createQueryBuilder('payment')
       .leftJoinAndSelect('payment.wifiAccount', 'wifiAccount')
@@ -154,6 +158,7 @@ export class PaymentService {
   }
 
   async updateStatus(id: string, status: PaymentStatus): Promise<Payment> {
+    this.logger.log(`updateStatus payment id=${id} status=${status}`);
     const payment = await this.paymentRepository.findOne({
       where: { id },
       relations: ['ticket'],

@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   ParseFilePipe,
   MaxFileSizeValidator,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -38,6 +39,8 @@ import { TicketStatus } from '../entities/ticket.entity';
 @ApiTags('Tickets')
 @Controller('tickets')
 export class TicketsController {
+  private readonly logger = new Logger(TicketsController.name);
+
   constructor(
     private readonly ticketsService: TicketsService,
     private readonly ticketTypesService: TicketTypesService,
@@ -49,6 +52,7 @@ export class TicketsController {
   @ApiQuery({ name: 'status', required: false, enum: TicketStatus, description: 'Filtrer par statut' })
   @ApiResponse({ status: 200, description: 'Liste des tickets' })
   async findAll(@Query('status') status?: TicketStatus) {
+    this.logger.log(`GET /tickets${status ? `?status=${status}` : ''}`);
     const tickets = await this.ticketsService.findAll(status);
     // Masquer les mots de passe dans la liste
     return tickets.map((ticket) => ({
@@ -61,6 +65,7 @@ export class TicketsController {
   @ApiOperation({ summary: 'Liste uniquement les tickets disponibles à la vente' })
   @ApiResponse({ status: 200, description: 'Liste des tickets disponibles' })
   async findAvailable() {
+    this.logger.log('GET /tickets/available');
     const tickets = await this.ticketsService.findAvailable();
     return tickets.map((ticket) => ({
       ...ticket,
@@ -72,6 +77,7 @@ export class TicketsController {
   @ApiOperation({ summary: 'Liste tous les types de tickets avec leur nombre disponible (ex: page /home)' })
   @ApiResponse({ status: 200, description: 'Liste des types de tickets (name, price, timeLimit, dataLimit, availableCount)' })
   async getTicketTypes() {
+    this.logger.log('GET /tickets/types');
     return await this.ticketTypesService.findAllWithCounts();
   }
 
@@ -80,6 +86,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Type de ticket avec availableCount' })
   @ApiResponse({ status: 404, description: 'Type non trouvé' })
   async getTicketTypeById(@Param('id') id: string) {
+    this.logger.log(`GET /tickets/types/${id}`);
     return await this.ticketTypesService.findOneWithCount(id);
   }
 
@@ -87,6 +94,7 @@ export class TicketsController {
   @ApiOperation({ summary: 'Liste tous les tickets disponibles d\'un type spécifique' })
   @ApiResponse({ status: 200, description: 'Liste des tickets du type' })
   async findByType(@Param('typeId') typeId: string) {
+    this.logger.log(`GET /tickets/type/${typeId}`);
     const tickets = await this.ticketsService.findAvailableByType(typeId);
     return tickets.map((ticket) => ({
       ...ticket,
@@ -99,6 +107,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Détails du ticket' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   async findOne(@Param('id') id: string) {
+    this.logger.log(`GET /tickets/${id}`);
     const ticket = await this.ticketsService.findOne(id);
     return {
       ...ticket,
@@ -139,7 +148,9 @@ export class TicketsController {
   })
   @ApiResponse({ status: 400, description: 'Ticket non disponible' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
+  @ApiBody({ type: PurchaseTicketDto })
   async purchase(@Body() purchaseDto: PurchaseTicketDto) {
+    this.logger.log(`POST /tickets/purchase ticketId=${purchaseDto.ticketId}`);
     return await this.ticketsService.purchase(
       purchaseDto.ticketId,
       purchaseDto.phoneNumber,
@@ -152,6 +163,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Ticket réservé' })
   @ApiResponse({ status: 400, description: 'Ticket non disponible' })
   async reserve(@Param('id') id: string) {
+    this.logger.log(`POST /tickets/${id}/reserve`);
     const ticket = await this.ticketsService.reserve(id);
     return {
       ...ticket,
@@ -164,6 +176,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Ticket libéré' })
   @ApiResponse({ status: 400, description: 'Ticket non réservé' })
   async release(@Param('id') id: string) {
+    this.logger.log(`POST /tickets/${id}/release`);
     const ticket = await this.ticketsService.release(id);
     return {
       ...ticket,
@@ -208,9 +221,10 @@ export class TicketsController {
         ],
       }),
     )
-    file: Express.Multer.File,
+    file: { buffer: Buffer },
     @Body() importDto?: ImportTicketsDto,
   ) {
+    this.logger.log('POST /tickets/admin/import');
     const csvContent = file.buffer.toString('utf-8');
     return await this.ticketsService.importFromCSV(csvContent, importDto?.defaultPrice);
   }
@@ -222,6 +236,7 @@ export class TicketsController {
   @ApiOperation({ summary: 'Statistiques sur les tickets (Admin)' })
   @ApiResponse({ status: 200, description: 'Statistiques des tickets' })
   async getStats() {
+    this.logger.log('GET /tickets/admin/stats');
     return await this.ticketsService.getStats();
   }
 
@@ -233,6 +248,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Prix modifié' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   async updatePrice(@Param('id') id: string, @Body('price') price: number) {
+    this.logger.log(`PUT /tickets/admin/${id}/price`);
     const ticket = await this.ticketsService.updatePrice(id, price);
     return {
       ...ticket,
@@ -248,6 +264,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Ticket supprimé' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   async remove(@Param('id') id: string) {
+    this.logger.log(`DELETE /tickets/admin/${id}`);
     await this.ticketsService.remove(id);
     return { message: 'Ticket deleted successfully' };
   }
@@ -258,6 +275,7 @@ export class TicketsController {
   @ApiResponse({ status: 200, description: 'Webhook traité avec succès' })
   @ApiResponse({ status: 400, description: 'Données invalides' })
   async handlePaymentWebhook(@Body() webhookDto: PaymentWebhookDto) {
+    this.logger.log(`POST /tickets/webhook/payment paymentId=${webhookDto.paymentId} status=${webhookDto.status}`);
     await this.ticketsWebhookService.handlePaymentWebhook(
       webhookDto.paymentId,
       webhookDto.status,

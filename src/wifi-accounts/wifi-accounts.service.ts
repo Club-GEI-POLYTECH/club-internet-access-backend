@@ -63,6 +63,7 @@ export class WiFiAccountsService {
   }
 
   async create(createDto: CreateWiFiAccountDto, createdById?: string): Promise<WiFiAccount> {
+    this.logger.log(`create wifi account duration=${createDto.duration} createdById=${createdById ?? 'none'}`);
     // Generate username and password if not provided
     const username = createDto.username || this.generateUsername();
     const password = this.generatePassword();
@@ -112,6 +113,7 @@ export class WiFiAccountsService {
   }
 
   async findAll(userId?: string, userRole?: UserRole): Promise<WiFiAccount[]> {
+    this.logger.log(`findAll wifi accounts userId=${userId ?? 'all'} role=${userRole ?? 'all'}`);
     // Les étudiants voient uniquement leurs propres comptes
     if (userRole === UserRole.STUDENT && userId) {
       return await this.wifiAccountsRepository.find({

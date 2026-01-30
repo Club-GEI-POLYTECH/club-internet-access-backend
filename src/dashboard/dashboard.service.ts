@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WiFiAccount } from '../entities/wifi-account.entity';
@@ -10,6 +10,8 @@ import { MikroTikService } from '../mikrotik/mikrotik.service';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectRepository(WiFiAccount)
     private wifiAccountsRepository: Repository<WiFiAccount>,
@@ -25,6 +27,7 @@ export class DashboardService {
   ) {}
 
   async getDashboardStats() {
+    this.logger.log('getDashboardStats');
     const [
       totalAccounts,
       activeAccounts,
@@ -132,6 +135,7 @@ export class DashboardService {
   }
 
   async getMyStats(userId: string) {
+    this.logger.log(`getMyStats userId=${userId}`);
     const [wifiAccountsCount, paymentsCount] = await Promise.all([
       this.wifiAccountsRepository.count({ where: { createdById: userId } }),
       this.paymentsRepository.count({ where: { createdById: userId } }),
@@ -143,6 +147,7 @@ export class DashboardService {
   }
 
   async getChartData(days: number = 7) {
+    this.logger.log(`getChartData days=${days}`);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 

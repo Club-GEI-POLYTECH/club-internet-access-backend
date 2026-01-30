@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   ParseFilePipe,
   MaxFileSizeValidator,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -36,6 +37,8 @@ import { UserRole } from '../entities/user.entity';
 @ApiTags('Tickets (Admin)')
 @Controller('admin/tickets')
 export class TicketsAdminController {
+  private readonly logger = new Logger(TicketsAdminController.name);
+
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post('import')
@@ -76,6 +79,7 @@ export class TicketsAdminController {
     file: { buffer: Buffer },
     @Body() importDto?: ImportTicketsDto,
   ) {
+    this.logger.log('POST /admin/tickets/import');
     const csvContent = file.buffer.toString('utf-8');
     return await this.ticketsService.importFromCSV(csvContent, importDto?.defaultPrice);
   }
@@ -87,6 +91,7 @@ export class TicketsAdminController {
   @ApiOperation({ summary: 'Statistiques sur les tickets (Admin)' })
   @ApiResponse({ status: 200, description: 'Statistiques des tickets' })
   async getStats() {
+    this.logger.log('GET /admin/tickets/stats');
     return await this.ticketsService.getStats();
   }
 
@@ -98,6 +103,7 @@ export class TicketsAdminController {
   @ApiResponse({ status: 200, description: 'Prix modifié' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   async updatePrice(@Param('id') id: string, @Body('price') price: number) {
+    this.logger.log(`PUT /admin/tickets/${id}/price price=${price}`);
     const ticket = await this.ticketsService.updatePrice(id, price);
     return {
       ...ticket,
@@ -113,6 +119,7 @@ export class TicketsAdminController {
   @ApiResponse({ status: 200, description: 'Ticket supprimé' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   async remove(@Param('id') id: string) {
+    this.logger.log(`DELETE /admin/tickets/${id}`);
     await this.ticketsService.remove(id);
     return { message: 'Ticket deleted successfully' };
   }

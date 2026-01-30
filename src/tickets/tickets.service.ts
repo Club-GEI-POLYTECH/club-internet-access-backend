@@ -35,6 +35,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   async findAll(status?: TicketStatus): Promise<Ticket[]> {
+    this.logger.log(`findAll tickets${status ? ` status=${status}` : ''}`);
     const where: any = {};
     if (status) {
       where.status = status;
@@ -63,6 +64,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   async findOne(id: string): Promise<Ticket> {
+    this.logger.log(`findOne ticket id=${id}`);
     const ticket = await this.ticketsRepository.findOne({
       where: { id },
       relations: ['ticketType', 'payment'],
@@ -87,6 +89,7 @@ export class TicketsService implements OnModuleInit {
     phoneNumber: string,
     method: PaymentMethod,
   ): Promise<{ ticket: Ticket; payment: Payment; credentials: any }> {
+    this.logger.log(`purchase ticketId=${ticketId} phone=${phoneNumber} method=${method}`);
     const ticket = await this.findOne(ticketId);
 
     if (ticket.status !== TicketStatus.AVAILABLE) {
@@ -120,6 +123,7 @@ export class TicketsService implements OnModuleInit {
       // Décrypter le mot de passe pour l'exposer
       const decryptedPassword = await this.decryptPassword(ticket.password);
 
+      this.logger.log(`purchase success ticketId=${ticketId}`);
       return {
         ticket: {
           ...ticket,
@@ -139,11 +143,13 @@ export class TicketsService implements OnModuleInit {
       ticket.status = TicketStatus.AVAILABLE;
       ticket.paymentId = null;
       await this.ticketsRepository.save(ticket);
+      this.logger.warn(`purchase failed, ticket ${ticketId} released: ${error?.message}`);
       throw error;
     }
   }
 
   async reserve(id: string): Promise<Ticket> {
+    this.logger.log(`reserve ticket id=${id}`);
     const ticket = await this.findOne(id);
 
     if (ticket.status !== TicketStatus.AVAILABLE) {
@@ -155,6 +161,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   async release(id: string): Promise<Ticket> {
+    this.logger.log(`release ticket id=${id}`);
     const ticket = await this.findOne(id);
 
     if (ticket.status !== TicketStatus.RESERVED) {
@@ -167,6 +174,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   async markAsSold(ticketId: string, phoneNumber: string): Promise<Ticket> {
+    this.logger.log(`markAsSold ticketId=${ticketId} soldTo=${phoneNumber}`);
     const ticket = await this.findOne(ticketId);
     ticket.status = TicketStatus.SOLD;
     ticket.soldAt = new Date();
@@ -175,6 +183,7 @@ export class TicketsService implements OnModuleInit {
   }
 
   async markAsFailed(ticketId: string): Promise<Ticket> {
+    this.logger.log(`markAsFailed ticketId=${ticketId} (released)`);
     const ticket = await this.findOne(ticketId);
     ticket.status = TicketStatus.AVAILABLE;
     ticket.paymentId = null;
@@ -186,6 +195,7 @@ export class TicketsService implements OnModuleInit {
     failed: number;
     errors: string[];
   }> {
+    this.logger.log(`importFromCSV lines≈${csvContent.split('\n').length} defaultPrice=${defaultPrice ?? 'none'}`);
     const errors: string[] = [];
     let imported = 0;
     let failed = 0;
@@ -195,6 +205,7 @@ export class TicketsService implements OnModuleInit {
       const lines = csvContent.split('\n').filter(line => line.trim());
       if (lines.length === 0) {
         errors.push('CSV vide');
+        this.logger.warn('importFromCSV: CSV vide');
         return { imported: 0, failed: 0, errors };
       }
 
@@ -272,6 +283,7 @@ export class TicketsService implements OnModuleInit {
       failed++;
     }
 
+    this.logger.log(`importFromCSV done imported=${imported} failed=${failed} errors=${errors.length}`);
     return { imported, failed, errors };
   }
 
@@ -295,6 +307,7 @@ export class TicketsService implements OnModuleInit {
     });
 
     const revenue = soldTickets.reduce((sum, ticket) => sum + Number(ticket.price), 0);
+    this.logger.log(`getStats total=${total} available=${available} sold=${sold} reserved=${reserved} revenue=${revenue}`);
 
     return {
       total,
@@ -306,12 +319,14 @@ export class TicketsService implements OnModuleInit {
   }
 
   async updatePrice(id: string, price: number): Promise<Ticket> {
+    this.logger.log(`updatePrice id=${id} price=${price}`);
     const ticket = await this.findOne(id);
     ticket.price = price;
     return await this.ticketsRepository.save(ticket);
   }
 
   async remove(id: string): Promise<void> {
+    this.logger.log(`remove ticket id=${id}`);
     const ticket = await this.findOne(id);
     await this.ticketsRepository.remove(ticket);
   }

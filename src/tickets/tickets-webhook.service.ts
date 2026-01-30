@@ -72,6 +72,7 @@ export class TicketsWebhookService {
    * Traite un webhook de paiement
    */
   async handlePaymentWebhook(paymentId: string, status: PaymentStatus): Promise<void> {
+    this.logger.log(`handlePaymentWebhook paymentId=${paymentId} status=${status}`);
     if (status === PaymentStatus.COMPLETED) {
       await this.handlePaymentCompleted(paymentId);
     } else if (status === PaymentStatus.FAILED) {

@@ -88,6 +88,8 @@ async function bootstrap() {
     .addTag('Users', 'Gestion des utilisateurs système')
     .addTag('Bandwidth', 'Statistiques de bande passante')
     .addTag('App', 'Endpoints publics')
+    .addTag('Tickets', 'Vente et import de tickets Wi-Fi (Mikhmon)')
+    .addTag('Tickets (Admin)', 'Import et gestion des tickets (admin)')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);

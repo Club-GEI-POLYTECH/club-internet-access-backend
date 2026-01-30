@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../entities/user.entity';
@@ -6,12 +6,15 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}
 
   async create(userData: Partial<User>): Promise<User> {
+    this.logger.log(`create user email=${userData.email} role=${userData.role}`);
     // Hasher le mot de passe si fourni (comme dans register)
     if (userData.password) {
       const hashedPassword = await bcrypt.hash(userData.password, 10);
@@ -22,7 +25,9 @@ export class UsersService {
     }
     
     const user = this.usersRepository.create(userData);
-    return await this.usersRepository.save(user);
+    const saved = await this.usersRepository.save(user);
+    this.logger.log(`user created id=${saved.id}`);
+    return saved;
   }
 
   async findAll(): Promise<User[]> {
@@ -32,6 +37,7 @@ export class UsersService {
   }
 
   async findOne(id: string): Promise<User> {
+    this.logger.log(`findOne user id=${id}`);
     return await this.usersRepository.findOne({
       where: { id },
       relations: ['wifiAccounts', 'payments'],
@@ -45,6 +51,7 @@ export class UsersService {
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
+    this.logger.log(`update user id=${id}`);
     // Hasher le mot de passe si fourni dans la mise à jour
     if (userData.password) {
       const hashedPassword = await bcrypt.hash(userData.password, 10);
@@ -59,6 +66,7 @@ export class UsersService {
   }
 
   async remove(id: string): Promise<void> {
+    this.logger.log(`remove user id=${id}`);
     await this.usersRepository.delete(id);
   }
 

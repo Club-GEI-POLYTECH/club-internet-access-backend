@@ -18,6 +18,7 @@ export class SessionsService {
   ) {}
 
   async syncActiveSessions(): Promise<number> {
+    this.logger.log('syncActiveSessions start');
     try {
       const activeUsers = await this.mikrotikService.getActiveUsers();
       let syncedCount = 0;
@@ -65,6 +66,7 @@ export class SessionsService {
         .andWhere('mikrotikSessionId NOT IN (:...ids)', { ids: activeSessionIds.length > 0 ? activeSessionIds : [''] })
         .execute();
 
+      this.logger.log(`syncActiveSessions done synced=${syncedCount} active=${activeUsers.length}`);
       return syncedCount;
     } catch (error) {
       if (error?.message?.includes('Not connected to MikroTik')) {

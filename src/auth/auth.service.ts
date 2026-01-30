@@ -46,6 +46,7 @@ export class AuthService {
   }
 
   async login(user: any) {
+    this.logger.log(`login success email=${user.email} role=${user.role}`);
     const payload = { email: user.email, sub: user.id, role: user.role };
     return {
       access_token: this.jwtService.sign(payload),
@@ -60,12 +61,13 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
+    this.logger.log(`register attempt email=${registerDto.email}`);
     // L'inscription publique ne permet que le rôle 'student'
     // Les rôles 'admin' et 'agent' doivent être créés par un administrateur
     if (registerDto.role && registerDto.role !== UserRole.STUDENT) {
       throw new BadRequestException('Seuls les étudiants peuvent s\'inscrire via l\'inscription publique');
     }
-    
+
     // usersService.create() hash automatiquement le mot de passe
     // Pas besoin de le hasher ici
     const user = await this.usersService.create({
@@ -74,6 +76,7 @@ export class AuthService {
       role: UserRole.STUDENT,
     });
 
+    this.logger.log(`register success email=${user.email} id=${user.id}`);
     const { password, ...result } = user;
     return result;
   }
@@ -172,6 +175,7 @@ export class AuthService {
   }
 
   async getUserProfile(userId: string) {
+    this.logger.log(`getUserProfile userId=${userId}`);
     return await this.usersService.findOne(userId);
   }
 }
