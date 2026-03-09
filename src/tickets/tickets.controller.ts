@@ -14,6 +14,7 @@ import {
   MaxFileSizeValidator,
   Logger,
   Request,
+  FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -240,7 +241,10 @@ export class TicketsController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-        ],
+          // new FileTypeValidator({
+          //   fileType: /^(text\/csv|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet)$/i,
+          // })
+          ],
         fileIsRequired: true,
       }),
     )
