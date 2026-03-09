@@ -88,8 +88,11 @@ export class TicketsService implements OnModuleInit {
     ticketId: string,
     phoneNumber: string,
     method: PaymentMethod,
+    userId?: string,
   ): Promise<{ ticket: Ticket; payment: Payment; credentials: any }> {
-    this.logger.log(`purchase ticketId=${ticketId} phone=${phoneNumber} method=${method}`);
+    this.logger.log(
+      `purchase ticketId=${ticketId} phone=${phoneNumber} method=${method} userId=${userId ?? 'anonymous'}`,
+    );
     const ticket = await this.findOne(ticketId);
 
     if (ticket.status !== TicketStatus.AVAILABLE) {
@@ -113,7 +116,7 @@ export class TicketsService implements OnModuleInit {
           ticketId: ticket.id,
           notes: `Purchase of ticket ${ticket.username}`,
         },
-        undefined, // Pas d'utilisateur connecté pour les achats publics
+        userId,
       );
 
       // Lier le paiement au ticket
@@ -190,12 +193,28 @@ export class TicketsService implements OnModuleInit {
     return await this.ticketsRepository.save(ticket);
   }
 
+  async findForUser(userId: string): Promise<Ticket[]> {
+    this.logger.log(`findForUser userId=${userId}`);
+    return await this.ticketsRepository.find({
+      where: {
+        payment: {
+          createdById: userId,
+        } as any,
+      },
+      relations: ['ticketType', 'payment'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async importFromCSV(csvContent: string, defaultPrice?: number): Promise<{
     imported: number;
     failed: number;
     errors: string[];
   }> {
-    this.logger.log(`importFromCSV lines≈${csvContent.split('\n').length} defaultPrice=${defaultPrice ?? 'none'}`);
+    const lineCount = csvContent.split('\n').length;
+    this.logger.log(
+      `importFromCSV start lines≈${lineCount} defaultPrice=${defaultPrice ?? 'none'}`,
+    );
     const errors: string[] = [];
     let imported = 0;
     let failed = 0;
@@ -274,16 +293,22 @@ export class TicketsService implements OnModuleInit {
           await this.ticketsRepository.save(ticket);
           imported++;
         } catch (error) {
+          this.logger.error(
+            `Erreur lors de l'import d'une ligne CSV: ${error?.message}`,
+          );
           errors.push(`Erreur lors de l'import: ${error.message}`);
           failed++;
         }
       }
     } catch (error) {
+      this.logger.error(`Erreur de parsing CSV: ${error?.message}`);
       errors.push(`Erreur de parsing CSV: ${error.message}`);
       failed++;
     }
 
-    this.logger.log(`importFromCSV done imported=${imported} failed=${failed} errors=${errors.length}`);
+    this.logger.log(
+      `importFromCSV done imported=${imported} failed=${failed} errors=${errors.length}`,
+    );
     return { imported, failed, errors };
   }
 

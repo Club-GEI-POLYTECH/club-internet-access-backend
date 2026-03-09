@@ -5,20 +5,35 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
+  private readonly smtpConfigured: boolean;
 
   constructor(private configService: ConfigService) {
-    // Configuration pour MailHog (développement)
+    const host = (this.configService.get<string>('SMTP_HOST') ?? '').trim() || 'mailhog';
+    const port = parseInt(this.configService.get<string>('SMTP_PORT') || '1025', 10);
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isLocalhost = !host || host === 'localhost' || host === '127.0.0.1';
+    // MailHog est considéré comme configuré (utilisé en local Docker)
+    this.smtpConfigured = host === 'mailhog' || (!isProduction || !isLocalhost);
+
+    if (isProduction && !this.smtpConfigured) {
+      this.logger.warn(
+        'SMTP non configuré pour la production (SMTP_HOST manquant ou localhost). ' +
+          'Définissez SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS dans Railway pour envoyer les emails.',
+      );
+    }
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST', 'mailhog'),
-      port: parseInt(this.configService.get<string>('SMTP_PORT', '1025')),
-      secure: false,
-      auth: this.configService.get<string>('SMTP_USER')
-        ? {
-            user: this.configService.get<string>('SMTP_USER'),
-            pass: this.configService.get<string>('SMTP_PASS'),
-          }
-        : undefined,
+      host,
+      port,
+      secure: port === 465,
+      auth:
+        this.configService.get<string>('SMTP_USER') && this.configService.get<string>('SMTP_PASS')
+          ? {
+              user: this.configService.get<string>('SMTP_USER'),
+              pass: this.configService.get<string>('SMTP_PASS'),
+            }
+          : undefined,
     });
   }
 
@@ -90,6 +105,13 @@ export class NotificationsService {
         L'équipe ${appName}
       `,
     };
+
+    if (!this.smtpConfigured) {
+      const msg =
+        'SMTP non configuré en production. Définissez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans Railway (voir RAILWAY_VARIABLES.md).';
+      this.logger.error(msg);
+      throw new Error(msg);
+    }
 
     try {
       await this.transporter.sendMail(mailOptions);

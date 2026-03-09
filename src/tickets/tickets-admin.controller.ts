@@ -74,12 +74,15 @@ export class TicketsAdminController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
         ],
+        fileIsRequired: true,
       }),
     )
-    file: { buffer: Buffer },
+    file: any,
     @Body() importDto?: ImportTicketsDto,
   ) {
-    this.logger.log('POST /admin/tickets/import');
+    this.logger.log(
+      `POST /admin/tickets/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size}`,
+    );
     const csvContent = file.buffer.toString('utf-8');
     return await this.ticketsService.importFromCSV(csvContent, importDto?.defaultPrice);
   }

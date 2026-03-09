@@ -13,6 +13,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   Logger,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -116,7 +117,9 @@ export class TicketsController {
   }
 
   @Post('purchase')
-  @ApiOperation({ summary: 'Achète un ticket (publique)' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Achète un ticket (utilisateur authentifié)' })
   @ApiResponse({
     status: 201,
     description: 'Ticket acheté avec succès',
@@ -147,15 +150,34 @@ export class TicketsController {
     },
   })
   @ApiResponse({ status: 400, description: 'Ticket non disponible' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
   @ApiBody({ type: PurchaseTicketDto })
-  async purchase(@Body() purchaseDto: PurchaseTicketDto) {
-    this.logger.log(`POST /tickets/purchase ticketId=${purchaseDto.ticketId}`);
+  async purchase(@Body() purchaseDto: PurchaseTicketDto, @Request() req) {
+    this.logger.log(
+      `POST /tickets/purchase ticketId=${purchaseDto.ticketId} userId=${req.user?.userId}`,
+    );
     return await this.ticketsService.purchase(
       purchaseDto.ticketId,
       purchaseDto.phoneNumber,
       purchaseDto.method,
+      req.user.userId,
     );
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Liste les tickets achetés par l’utilisateur connecté' })
+  @ApiResponse({ status: 200, description: 'Liste des tickets de l’utilisateur' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  async getMyTickets(@Request() req) {
+    this.logger.log(`GET /tickets/me userId=${req.user?.userId}`);
+    const tickets = await this.ticketsService.findForUser(req.user.userId);
+    return tickets.map((ticket) => ({
+      ...ticket,
+      password: '***',
+    }));
   }
 
   @Post(':id/reserve')
@@ -219,12 +241,15 @@ export class TicketsController {
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
         ],
+        fileIsRequired: true,
       }),
     )
-    file: { buffer: Buffer },
+    file: any,
     @Body() importDto?: ImportTicketsDto,
   ) {
-    this.logger.log('POST /tickets/admin/import');
+    this.logger.log(
+      `POST /tickets/admin/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size}`,
+    );
     const csvContent = file.buffer.toString('utf-8');
     return await this.ticketsService.importFromCSV(csvContent, importDto?.defaultPrice);
   }

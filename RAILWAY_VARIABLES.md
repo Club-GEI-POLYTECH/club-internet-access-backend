@@ -89,6 +89,25 @@ SMTP_FROM=noreply@unikin.cd
 APP_NAME=Club Internet Access UNIKIN
 ```
 
+## 📧 SMTP (emails – réinitialisation mot de passe)
+
+En production, les emails (ex. réinitialisation de mot de passe) **nécessitent un serveur SMTP réel**. Si `SMTP_HOST` est vide ou vaut `localhost`/`127.0.0.1`, vous verrez une erreur du type `connect ECONNREFUSED 127.0.0.1:587`.
+
+**À configurer dans Railway** (service Backend → Variables) :
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=votre-email@gmail.com
+SMTP_PASS=votre-mot-de-passe-application
+SMTP_FROM=noreply@votredomaine.com
+```
+
+- **Gmail** : utilisez un [mot de passe d’application](https://support.google.com/accounts/answer/185833), pas votre mot de passe habituel.
+- **Autres fournisseurs** : consultez leur doc (ex. SMTP SendGrid, Mailgun, OVH, etc.) pour `SMTP_HOST` et `SMTP_PORT` (souvent 587 ou 465).
+
+Sans SMTP correctement configuré, la réinitialisation de mot de passe renverra une erreur explicite au lieu d’essayer d’envoyer vers localhost.
+
 ## 🐛 Dépannage
 
 ### Les variables PG* ne sont toujours pas détectées
