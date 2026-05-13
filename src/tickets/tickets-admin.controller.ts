@@ -53,7 +53,20 @@ export class TicketsAdminController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'CSV Mikhmon — prix selon Time Limit (24h / 7d / 30d), variables TICKET_PRICE_*',
+          description:
+            'CSV Mikhmon (Username, Password, Profile, …). Type catalogue : uniquement ticketTypeId ou catalogDuration (Time Limit / Data Limit du fichier ignorés pour le type et pour les champs timeLimit/dataLimit du ticket).',
+        },
+        catalogDuration: {
+          type: 'string',
+          enum: ['24h', '7j', '30j'],
+          description:
+            'Sans ticketTypeId : force le type catalogue pour toutes les lignes. Ignoré si ticketTypeId est envoyé.',
+        },
+        ticketTypeId: {
+          type: 'string',
+          format: 'uuid',
+          description:
+            'UUID du TicketType (GET /tickets/types). Tous les tickets importés sont liés à ce type ; prioritaire sur catalogDuration et sur la déduction CSV.',
         },
       },
     },
@@ -72,13 +85,13 @@ export class TicketsAdminController {
       }),
     )
     file: any,
-    @Body() _importDto?: ImportTicketsDto,
+    @Body() importDto: ImportTicketsDto,
   ) {
     this.logger.log(
-      `POST /admin/tickets/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size}`,
+      `POST /admin/tickets/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size} ticketTypeId=${importDto?.ticketTypeId ?? '—'} catalogDuration=${importDto?.catalogDuration ?? 'auto'}`,
     );
     const csvContent = file.buffer.toString('utf-8');
-    return await this.ticketsService.importFromCSV(csvContent);
+    return await this.ticketsService.importFromCSV(csvContent, importDto);
   }
 
   @Get('stats')

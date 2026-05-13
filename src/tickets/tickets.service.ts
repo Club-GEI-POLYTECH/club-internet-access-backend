@@ -8,11 +8,13 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
+import { andCatalogAvailableForTicket } from './catalog-available.query';
 import { Ticket, TicketStatus } from '../entities/ticket.entity';
 import { TicketType } from '../entities/ticket-type.entity';
 import { Payment, PaymentStatus, PaymentMethod } from '../entities/payment.entity';
 import { PaymentService } from '../payment/payment.service';
+import type { ImportTicketsDto } from './dto/import-tickets.dto';
 import * as crypto from 'crypto';
 // csv-parse sera installé via npm install csv-parse
 // Pour l'instant, on utilise une implémentation simple de parsing CSV
@@ -65,12 +67,12 @@ export class TicketsService implements OnModuleInit {
    * Variables : TICKET_PRICE_24H, TICKET_PRICE_7D, TICKET_PRICE_30D
    */
   priceFromTimeLimit(timeLimitRaw: string): number {
-    const t = (timeLimitRaw || '').trim().toLowerCase().replace(/\s+/g, '');
     const p24 = Number(process.env.TICKET_PRICE_24H ?? 1000);
     const p7 = Number(process.env.TICKET_PRICE_7D ?? 3500);
     const p30 = Number(process.env.TICKET_PRICE_30D ?? 9000);
-    if (t.includes('30')) return p30;
-    if (t.includes('7')) return p7;
+    const bucket = this.classifyTimeLimitDuration(timeLimitRaw);
+    if (bucket === '30j') return p30;
+    if (bucket === '7j') return p7;
     return p24;
   }
 
@@ -89,18 +91,29 @@ export class TicketsService implements OnModuleInit {
   }
 
   async findAvailable(): Promise<Ticket[]> {
-    return await this.findAll(TicketStatus.AVAILABLE);
+    const qb = this.ticketsRepository
+      .createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.ticketType', 'ticketType')
+      .leftJoinAndSelect('ticket.payment', 'payment');
+    andCatalogAvailableForTicket(qb);
+    return qb.orderBy('ticket.createdAt', 'DESC').getMany();
   }
 
   async findAvailableByType(typeId: string): Promise<Ticket[]> {
-    return await this.ticketsRepository.find({
-      where: {
-        status: TicketStatus.AVAILABLE,
-        ticketTypeId: typeId,
-      },
-      relations: ['ticketType'],
-      order: { createdAt: 'DESC' },
-    });
+    const qb = this.ticketsRepository
+      .createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.ticketType', 'ticketType')
+      .leftJoinAndSelect('ticket.payment', 'payment')
+      .where('ticket.ticketTypeId = :typeId', { typeId });
+    andCatalogAvailableForTicket(qb);
+    return qb.orderBy('ticket.createdAt', 'DESC').getMany();
+  }
+
+  /** Nombre de tickets réellement achetables (exclut ceux avec un paiement Kelpay PENDING/PROCESSING). */
+  async countCatalogAvailableTickets(): Promise<number> {
+    const qb = this.ticketsRepository.createQueryBuilder('ticket');
+    andCatalogAvailableForTicket(qb);
+    return qb.getCount();
   }
 
   async findOne(id: string): Promise<Ticket> {
@@ -233,9 +246,84 @@ export class TicketsService implements OnModuleInit {
   async markAsFailed(ticketId: string): Promise<Ticket> {
     this.logger.log(`markAsFailed ticketId=${ticketId} (released)`);
     const ticket = await this.findOne(ticketId);
+    if (ticket.status === TicketStatus.SOLD) {
+      this.logger.warn(`markAsFailed: ticket ${ticketId} déjà vendu — pas de libération`);
+      return ticket;
+    }
     ticket.status = TicketStatus.AVAILABLE;
     ticket.paymentId = null;
     return await this.ticketsRepository.save(ticket);
+  }
+
+  /**
+   * Succès Kelpay : vendre le ticket **dans la même transaction** que le paiement.
+   * Pas d’étape `reserved` (évite ticket bloqué si l’étape suivante échoue ; le catalogue ne liste que `available`).
+   */
+  async claimTicketForSuccessfulKelpayPayment(
+    manager: EntityManager,
+    ticketId: string,
+    paymentId: string,
+    phoneNumber: string,
+  ): Promise<void> {
+    const ticketRepo = manager.getRepository(Ticket);
+    const ticket = await ticketRepo.findOne({
+      where: { id: ticketId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!ticket) {
+      this.logger.warn(`claimTicketForSuccessfulKelpayPayment: ticket introuvable id=${ticketId}`);
+      return;
+    }
+    if (ticket.status === TicketStatus.SOLD) {
+      this.logger.debug(
+        `claimTicketForSuccessfulKelpayPayment: ticket ${ticketId} déjà sold (idempotent)`,
+      );
+      return;
+    }
+    const reservedForThisPayment =
+      ticket.status === TicketStatus.RESERVED && ticket.paymentId === paymentId;
+    if (ticket.status !== TicketStatus.AVAILABLE && !reservedForThisPayment) {
+      this.logger.warn(
+        `claimTicketForSuccessfulKelpayPayment: ticket ${ticketId} status=${ticket.status} paymentId=${ticket.paymentId ?? 'none'} — attribution ignorée`,
+      );
+      return;
+    }
+    ticket.status = TicketStatus.SOLD;
+    ticket.soldAt = new Date();
+    ticket.soldTo = phoneNumber || '';
+    ticket.paymentId = paymentId;
+    await ticketRepo.save(ticket);
+    this.logger.log(
+      `claimTicketForSuccessfulKelpayPayment: ticket ${ticketId} → SOLD paymentId=${paymentId}`,
+    );
+  }
+
+  /**
+   * Mot de passe Wi‑Fi en clair — uniquement si le ticket est **vendu** (paiement finalisé).
+   * Retourne `undefined` si le statut n’est pas `sold` ou si le déchiffrement échoue.
+   */
+  async getPlainPasswordForSoldTicket(ticket: Ticket): Promise<string | undefined> {
+    if (ticket.status !== TicketStatus.SOLD) {
+      return undefined;
+    }
+    try {
+      return await this.decryptPassword(ticket.password);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.error(`getPlainPasswordForSoldTicket ticketId=${ticket.id}: ${msg}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Réponse API pour l’acheteur : mot de passe **en clair** si `sold`, sinon masqué.
+   */
+  async serializeTicketForOwner(ticket: Ticket): Promise<Ticket & { password: string }> {
+    const plain = await this.getPlainPasswordForSoldTicket(ticket);
+    return {
+      ...ticket,
+      password: plain ?? '***',
+    };
   }
 
   async findForUser(userId: string): Promise<Ticket[]> {
@@ -251,14 +339,18 @@ export class TicketsService implements OnModuleInit {
     });
   }
 
-  async importFromCSV(csvContent: string): Promise<{
+  async importFromCSV(
+    csvContent: string,
+    importDto?: ImportTicketsDto,
+  ): Promise<{
     imported: number;
     failed: number;
     errors: string[];
   }> {
     const lineCount = csvContent.split('\n').length;
+    const tid = importDto?.ticketTypeId?.trim();
     this.logger.log(
-      `importFromCSV start lines≈${lineCount}`,
+      `importFromCSV start lines≈${lineCount} ticketTypeId=${tid ?? '—'} catalogDuration=${importDto?.catalogDuration ?? 'auto'}`,
     );
     const errors: string[] = [];
     let imported = 0;
@@ -272,13 +364,37 @@ export class TicketsService implements OnModuleInit {
         return { imported: 0, failed: 0, errors };
       }
 
+      let sharedTicketType: TicketType;
+      if (tid) {
+        const tt = await this.ticketTypesRepository.findOne({ where: { id: tid } });
+        if (!tt) {
+          errors.push(`TicketType introuvable (ticketTypeId=${tid})`);
+          this.logger.warn(`importFromCSV: ticketTypeId invalide id=${tid}`);
+          return { imported: 0, failed: 0, errors };
+        }
+        if (!tt.isActive) {
+          errors.push(`TicketType inactif (ticketTypeId=${tid})`);
+          this.logger.warn(`importFromCSV: ticketType inactif id=${tid}`);
+          return { imported: 0, failed: 0, errors };
+        }
+        sharedTicketType = tt;
+      } else if (importDto?.catalogDuration) {
+        const cd = importDto.catalogDuration;
+        const price = this.priceFromTimeLimit(this.getDurationTimeLimit(cd));
+        sharedTicketType = await this.ensureTicketTypeForRecord(cd, null, null, price);
+      } else {
+        errors.push(
+          'Fournissez ticketTypeId ou catalogDuration : le type de ticket ne peut pas être déduit des colonnes CSV (Time Limit / Data Limit ignorés pour le catalogue).',
+        );
+        this.logger.warn('importFromCSV: refus — ni ticketTypeId ni catalogDuration');
+        return { imported: 0, failed: 0, errors };
+      }
+
       for (const record of records) {
         try {
           const username = record.Username?.trim();
           const password = record.Password?.trim();
           const profile = record.Profile?.trim();
-          const timeLimit = record['Time Limit']?.trim() || null;
-          const dataLimit = record['Data Limit']?.trim() || null;
           const comment = record.Comment?.trim() || null;
 
           if (!username || !password || !profile) {
@@ -295,26 +411,18 @@ export class TicketsService implements OnModuleInit {
             continue;
           }
 
-          const durationKey = (timeLimit || '').trim() || '24h';
-          const durationType = this.getDurationType(durationKey);
-          const price = this.priceFromTimeLimit(durationKey);
-          const ticketType = await this.ensureTicketTypeForRecord(
-            durationType,
-            timeLimit,
-            dataLimit,
-            price,
-          );
+          const ticketType = sharedTicketType;
 
           // Chiffrer le mot de passe
           const encryptedPassword = await this.encryptPassword(password);
 
-          // Créer le ticket
+          // Créer le ticket — timeLimit / dataLimit : uniquement depuis le TicketType (jamais le CSV)
           const ticket = this.ticketsRepository.create({
             username,
             password: encryptedPassword,
             profile,
-            timeLimit: timeLimit || null,
-            dataLimit: dataLimit || null,
+            timeLimit: ticketType.timeLimit ?? null,
+            dataLimit: ticketType.dataLimit ?? null,
             comment,
             status: TicketStatus.AVAILABLE,
             ticketTypeId: ticketType.id,
@@ -349,8 +457,8 @@ export class TicketsService implements OnModuleInit {
     const byDuration = new Map<'24h' | '7j' | '30j', { count: number; sampleTimeLimit: string | null }>();
 
     for (const record of records) {
-      const timeLimit = record['Time Limit']?.trim() || null;
-      const durationType = this.getDurationType(timeLimit || '24h');
+      const timeLimit = this.getRecordTimeLimit(record);
+      const durationType = this.classifyTimeLimitDuration((timeLimit || '').trim() || '24h');
       if (!byDuration.has(durationType)) {
         byDuration.set(durationType, { count: 1, sampleTimeLimit: timeLimit });
       } else {
@@ -407,7 +515,7 @@ export class TicketsService implements OnModuleInit {
   }> {
     const [total, available, sold, reserved] = await Promise.all([
       this.ticketsRepository.count(),
-      this.ticketsRepository.count({ where: { status: TicketStatus.AVAILABLE } }),
+      this.countCatalogAvailableTickets(),
       this.ticketsRepository.count({ where: { status: TicketStatus.SOLD } }),
       this.ticketsRepository.count({ where: { status: TicketStatus.RESERVED } }),
     ]);
@@ -508,13 +616,45 @@ export class TicketsService implements OnModuleInit {
     }
   }
 
+  /** En-têtes CSV / Excel : BOM, espaces, alias « TimeLimit », etc. */
+  private canonicalImportHeader(raw: string): string {
+    const h = raw.replace(/^\ufeff/, '').trim();
+    const key = h.toLowerCase().replace(/\s+/g, '');
+    const aliases: Record<string, string> = {
+      username: 'Username',
+      user: 'Username',
+      password: 'Password',
+      profile: 'Profile',
+      timelimit: 'Time Limit',
+      time_limit: 'Time Limit',
+      datalimit: 'Data Limit',
+      data_limit: 'Data Limit',
+      comment: 'Comment',
+    };
+    return aliases[key] ?? h;
+  }
+
+  private getRecordTimeLimit(record: Record<string, unknown>): string | null {
+    const direct = record['Time Limit'];
+    if (typeof direct === 'string' && direct.trim() !== '') {
+      return direct.trim();
+    }
+    for (const [k, v] of Object.entries(record)) {
+      const nk = k.replace(/^\ufeff/, '').trim().toLowerCase().replace(/\s+/g, '');
+      if ((nk === 'timelimit' || nk === 'time_limit') && typeof v === 'string' && v.trim() !== '') {
+        return v.trim();
+      }
+    }
+    return null;
+  }
+
   private parseCsvRecords(csvContent: string): any[] {
     const lines = csvContent.split('\n').filter(line => line.trim());
     if (lines.length === 0) {
       return [];
     }
 
-    const headers = lines[0].split(',').map(h => h.trim());
+    const headers = lines[0].split(',').map(h => this.canonicalImportHeader(h.trim()));
     return lines.slice(1).map(line => {
       const values = line.split(',').map(v => v.trim());
       const record: any = {};
@@ -554,10 +694,40 @@ export class TicketsService implements OnModuleInit {
     return saved;
   }
 
-  private getDurationType(raw: string): '24h' | '7j' | '30j' {
-    const t = (raw || '').toLowerCase().replace(/\s+/g, '');
+  /**
+   * Classe la valeur « Time Limit » Mikhmon / Excel vers un bucket catalogue.
+   * Évite les faux positifs du type `includes('7')` (ex. `14d`, `17h`).
+   */
+  private classifyTimeLimitDuration(raw: string): '24h' | '7j' | '30j' {
+    const s = (raw || '').trim().toLowerCase();
+    const t = s.replace(/\s+/g, '');
+    if (!t) return '24h';
+    if (
+      t === '30d' ||
+      t === '30j' ||
+      t.includes('30d') ||
+      t.includes('30j') ||
+      t.includes('720h') ||
+      t === '1m' ||
+      t.includes('1month') ||
+      t.includes('30day')
+    ) {
+      return '30j';
+    }
+    if (
+      t === '7d' ||
+      t === '7j' ||
+      t.includes('7d') ||
+      t.includes('7j') ||
+      t.includes('168h') ||
+      t === '1w' ||
+      t.includes('1week') ||
+      t.includes('7day')
+    ) {
+      return '7j';
+    }
     if (t.includes('30')) return '30j';
-    if (t.includes('7')) return '7j';
+    if (t === '7' || t.startsWith('7d') || t.startsWith('7j')) return '7j';
     return '24h';
   }
 

@@ -4,10 +4,15 @@ import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   const configService = app.get(ConfigService);
+
+  // JSON + form-urlencoded (callbacks KELPAY souvent en application/x-www-form-urlencoded)
+  app.use(json({ limit: '2mb' }));
+  app.use(urlencoded({ extended: true, limit: '2mb' }));
   const logger = new Logger('Bootstrap');
 
   // CORS: site production + local + FRONTEND_URL (Railway peut n'avoir qu'une URL)
@@ -90,7 +95,7 @@ async function bootstrap() {
     )
     .addTag('Auth', 'Endpoints d\'authentification')
     .addTag('Payments', 'Paiements liés aux ventes de tickets')
-    .addTag('Kelpay', 'Mobile Money KELPAY — POST /payments/initiate (polling serveur checktransaction)')
+    .addTag('Kelpay', 'Mobile Money KELPAY — POST /payments/initiate, POST /payments/callback (webhook)')
     .addTag('Dashboard', 'Statistiques vente de tickets')
     .addTag('Users', 'Gestion des utilisateurs système')
     .addTag('App', 'Endpoints publics')

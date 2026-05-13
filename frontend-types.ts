@@ -128,6 +128,24 @@ export interface ImportTypeRecommendationsResponse {
   recommendations: ImportTypeRecommendation[];
 }
 
+/** Durée catalogue forcée à l’import (multipart `catalogDuration`). */
+export type ImportCatalogDuration = '24h' | '7j' | '30j';
+
+/** Réponse de `POST /admin/tickets/import` ou `POST /tickets/admin/import`. */
+export interface ImportTicketsCsvResponse {
+  imported: number;
+  failed: number;
+  errors: string[];
+}
+
+/** Champs multipart (camelCase) : au moins l’un des deux avec `file` (ticketTypeId prioritaire). */
+export interface ImportTicketsMultipartOptions {
+  /** UUID v4 — prioritaire : tous les tickets importés sont liés à ce `TicketType`. */
+  ticketTypeId?: string;
+  /** Utilisé seulement si `ticketTypeId` est absent (obligatoire dans ce cas). Ignoré pour le type si `ticketTypeId` est défini. */
+  catalogDuration?: ImportCatalogDuration;
+}
+
 // --- Paiements ---
 
 export enum PaymentStatus {
@@ -183,7 +201,7 @@ export interface InitiateKelpayPaymentRequest {
   userId: string;
 }
 
-/** Réponse backend après initiation KELPAY (polling serveur + callback en parallèle). */
+/** Réponse backend après initiation KELPAY ; enchaîner verify puis confirm (callback possible en parallèle). */
 export interface InitiateKelpayPaymentResponse {
   paymentId: string;
   merchantReference: string;
@@ -192,12 +210,58 @@ export interface InitiateKelpayPaymentResponse {
   kelpay: {
     raw: string;
     fields: Record<string, string>;
-    transactionId?: string;
-    reference?: string;
-    transactionStatus?: string;
-    kelpayCode?: string;
     message?: string;
+  } & Partial<{
+    code: string;
+    merchantcode: string;
+    transactionid: string;
+    reference: string;
+    transactionstatus: string;
+    transactiontype: string;
+    timestamp: string;
+    account: string;
+    accounttype: string;
+    provider: string;
+    amount: string;
+    currency: string;
+    subscriberreference: string;
+    description: string;
+    requestid: string;
+    callbackurl: string;
+  }>;
+}
+
+/** `POST /payments/:id/kelpay/verify` */
+export interface KelpayManualVerifyResponse {
+  paymentId: string;
+  paymentStatus: PaymentStatus;
+  kelpayTransactionStatus: string | null;
+  readyToConfirm: boolean;
+  message?: string;
+  merchantReference?: string;
+  transactionId?: string;
+}
+
+/** `POST /payments/:id/kelpay/confirm` */
+export interface KelpayManualConfirmResponse {
+  paymentId: string;
+  status: PaymentStatus;
+  alreadyFinalized: boolean;
+  ticket?: {
+    id: string;
+    username: string;
+    status: string;
+    profile?: string;
+    timeLimit?: string | null;
+    password?: string;
   };
+}
+
+/** `POST /payments/:id/kelpay/cancel` — abandon avant confirm (`pending` / `processing`). */
+export interface KelpayManualCancelResponse {
+  paymentId: string;
+  status: PaymentStatus;
+  alreadyTerminal: boolean;
 }
 
 // --- Dashboard ---

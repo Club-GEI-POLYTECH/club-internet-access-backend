@@ -16,11 +16,16 @@ import type {
   PurchaseTicketRequest,
   PurchaseTicketResponse,
   ImportTypeRecommendationsResponse,
+  ImportTicketsCsvResponse,
+  ImportTicketsMultipartOptions,
   Payment,
   CompletePaymentRequest,
   UpdatePaymentStatusRequest,
   InitiateKelpayPaymentRequest,
   InitiateKelpayPaymentResponse,
+  KelpayManualVerifyResponse,
+  KelpayManualConfirmResponse,
+  KelpayManualCancelResponse,
   DashboardStats,
   MyStats,
   ChartData,
@@ -150,6 +155,21 @@ export const apiClient = {
         formData,
       );
     },
+    /**
+     * Import CSV (admin). Au moins `ticketTypeId` ou `catalogDuration` avec `file`.
+     * Les colonnes CSV Time Limit / Data Limit ne déterminent pas le type ni les limites du ticket (uniquement le TicketType).
+     */
+    adminImportCsv: (file: File, options?: ImportTicketsMultipartOptions) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (options?.ticketTypeId) {
+        formData.append('ticketTypeId', options.ticketTypeId);
+      }
+      if (options?.catalogDuration) {
+        formData.append('catalogDuration', options.catalogDuration);
+      }
+      return apiRequestFormData<ImportTicketsCsvResponse>('/admin/tickets/import', formData);
+    },
     adminStats: () => apiRequest<Record<string, number>>('/tickets/admin/stats'),
   },
 
@@ -162,12 +182,18 @@ export const apiClient = {
       apiRequest<Payment>(`/payments/${id}/status`, { method: 'PUT', body: JSON.stringify(data) }),
     byTransaction: (transactionId: string) =>
       apiRequest<Payment>(`/payments/transaction/${transactionId}`),
-    /** Mobile Money KELPAY : réserve le ticket, envoie la push MM ; poller `get(paymentId)` jusqu’à statut terminal. */
+    /** Mobile Money KELPAY : réserve le ticket, envoie la push MM ; puis `verifyKelpay` + `confirmKelpay` (pas de polling serveur). */
     initiateKelpay: (data: InitiateKelpayPaymentRequest) =>
       apiRequest<InitiateKelpayPaymentResponse>('/payments/initiate', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    verifyKelpay: (paymentId: string) =>
+      apiRequest<KelpayManualVerifyResponse>(`/payments/${paymentId}/kelpay/verify`, { method: 'POST' }),
+    confirmKelpay: (paymentId: string) =>
+      apiRequest<KelpayManualConfirmResponse>(`/payments/${paymentId}/kelpay/confirm`, { method: 'POST' }),
+    cancelKelpay: (paymentId: string) =>
+      apiRequest<KelpayManualCancelResponse>(`/payments/${paymentId}/kelpay/cancel`, { method: 'POST' }),
   },
 
   dashboard: {

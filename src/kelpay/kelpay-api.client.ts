@@ -11,6 +11,7 @@ import {
 } from './kelpay.constants';
 import { KelpayParsedResponse, KelpayResponseKind } from './kelpay.types';
 import { parseKelpayResponse } from './kelpay-response.util';
+import { sanitizeKelpayRequestBody, truncateForLog } from './kelpay-logging.util';
 
 @Injectable()
 export class KelpayApiClient {
@@ -71,17 +72,26 @@ export class KelpayApiClient {
     let lastErr: unknown;
     for (let attempt = 0; attempt < KELPAY_HTTP_RETRY; attempt++) {
       try {
+        const safeBody = sanitizeKelpayRequestBody(body);
+        this.logger.log(
+          `[backend → KELPAY] POST ${url} attempt=${attempt + 1}/${KELPAY_HTTP_RETRY} body=${JSON.stringify(safeBody)}`,
+        );
         const res = await firstValueFrom(this.http.post<unknown>(url, body, cfg));
         const raw =
           typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? {});
         const parsed = parseKelpayResponse(raw, responseKind);
-        this.logger.debug(
-          `KELPAY POST ${url} kind=${responseKind} txStatus=${parsed.transactionStatus} tx=${parsed.transactionId ?? 'n/a'} code=${parsed.kelpayCode ?? 'n/a'}`,
+        this.logger.log(
+          `[KELPAY → backend] POST ${url} httpStatus=${res.status ?? 'n/a'} body=${truncateForLog(raw)} | parsed code=${parsed.code ?? 'n/a'} transactionstatus=${parsed.transactionstatus ?? 'n/a'} transactionid=${parsed.transactionid ?? 'n/a'} ref=${parsed.reference ?? 'n/a'}`,
         );
         return parsed;
       } catch (err: any) {
         lastErr = err;
-        this.logger.warn(`KELPAY HTTP erreur (tentative ${attempt + 1}/${KELPAY_HTTP_RETRY}): ${err?.message}`);
+        const st = err?.response?.status;
+        const data = err?.response?.data;
+        const dataStr = typeof data === 'string' ? data : JSON.stringify(data ?? {});
+        this.logger.warn(
+          `[KELPAY → backend] POST ${url} HTTP_ERROR attempt=${attempt + 1}/${KELPAY_HTTP_RETRY} httpStatus=${st ?? 'n/a'} body=${truncateForLog(dataStr)} axios=${err?.message ?? String(err)}`,
+        );
         if (attempt < KELPAY_HTTP_RETRY - 1) {
           await this.sleep(500 * (attempt + 1));
         }
@@ -96,7 +106,7 @@ export class KelpayApiClient {
     amount: number;
     currency: string;
     description: string;
-    /** Souvent vide : sans webhook Kelpay, on envoie une chaîne vide si le champ est requis par la passerelle. */
+    /** URL publique du webhook backend (requis par l’API payment.asp). */
     callbackurl?: string;
   }): Promise<KelpayParsedResponse> {
     const merchantcode = this.getMerchantCode();

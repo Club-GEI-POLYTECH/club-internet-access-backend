@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Club Internet Access API",
-    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.",
+    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,9 +12,33 @@
     { "key": "ticketId", "value": "" },
     { "key": "typeId", "value": "" },
     { "key": "transactionId", "value": "MTN123456" },
-    { "key": "merchantReference", "value": "" }
+    { "key": "merchantReference", "value": "" },
+    { "key": "keccelMerchantCode", "value": "" },
+    { "key": "keccelToken", "value": "" },
+    { "key": "kelpayTransactionId", "value": "" }
   ],
   "item": [
+    {
+      "name": "Keccel (direct — sans backend)",
+      "description": "Requêtes JSON vers **https://pay.keccel.com** (hors API Club). Remplir les variables de collection : `keccelMerchantCode` (= `KELPAY_MERCHANT_CODE`), `keccelToken` (= `KELPAY_TOKEN`, Bearer), `kelpayTransactionId` (champ `transactionId` renvoyé par Kelpay à l’initiation). Si vous utilisez **Basic** au lieu du Bearer : onglet Authorization Postman → Basic Auth, ou en-tête `Authorization: Basic …` à la place du Bearer.",
+      "item": [
+        {
+          "name": "Check transaction (checktransaction.asp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keccelToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantcode\": \"{{keccelMerchantCode}}\",\n  \"transactionid\": \"{{kelpayTransactionId}}\"\n}"
+            },
+            "url": "https://pay.keccel.com/kelpay/v1/checktransaction.asp"
+          }
+        }
+      ]
+    },
     {
       "name": "App",
       "item": [
@@ -392,35 +416,65 @@
     },
     {
       "name": "Payments",
-      "description": "Paiements : achat `POST /tickets/purchase`, KELPAY `POST /payments/initiate` (polling serveur checktransaction), complétion admin.",
+      "description": "Paiements : achat `POST /tickets/purchase`. **KELPAY** : initiate → verify → confirm ; **`POST /payments/{{paymentId}}/kelpay/cancel`** pour abandonner tant que `pending`/`processing`. Callback Kelpay peut finaliser en parallèle. **Admin** : `POST /payments/:id/complete` (autre flux, rôle admin/agent).",
       "item": [
         {
-          "name": "KELPAY Initiate (Mobile Money)",
-          "event": [
+          "name": "KELPAY (3 étapes + cancel)",
+          "description": "Ordre : 1) Initiate — 2) après validation sur le téléphone, Verify (répéter si pending) — 3) Confirm. **Cancel** : abandon avant confirm (`pending`/`processing`). Variables : token, userId, ticketId, amount = prix du type.",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json.paymentId) { pm.collectionVariables.set('paymentId', json.paymentId); }",
-                  "if (json.merchantReference) { pm.collectionVariables.set('merchantReference', json.merchantReference); }"
+              "name": "1. Initiate",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var json = pm.response.json();",
+                      "if (json.paymentId) { pm.collectionVariables.set('paymentId', json.paymentId); }",
+                      "if (json.merchantReference) { pm.collectionVariables.set('merchantReference', json.merchantReference); }"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
-                "type": "text/javascript"
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"amount\": 1000,\n  \"userId\": \"{{userId}}\"\n}"
+                },
+                "url": "{{baseUrl}}/api/payments/initiate"
+              }
+            },
+            {
+              "name": "2. Verify (checktransaction ×1)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                "url": "{{baseUrl}}/api/payments/{{paymentId}}/kelpay/verify"
+              }
+            },
+            {
+              "name": "3. Confirm (finaliser + ticket)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                "url": "{{baseUrl}}/api/payments/{{paymentId}}/kelpay/confirm"
+              }
+            },
+            {
+              "name": "Cancel (abandon avant confirm)",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+                "url": "{{baseUrl}}/api/payments/{{paymentId}}/kelpay/cancel"
               }
             }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"amount\": 1000,\n  \"userId\": \"{{userId}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/payments/initiate"
-          }
+          ]
         },
         {
           "name": "List Payments",

@@ -63,7 +63,9 @@ export class TicketsWebhookService {
 
     if (
       payment.ticketId &&
-      (payment.status === PaymentStatus.FAILED || payment.status === PaymentStatus.EXPIRED)
+      (payment.status === PaymentStatus.FAILED ||
+        payment.status === PaymentStatus.EXPIRED ||
+        payment.status === PaymentStatus.CANCELLED)
     ) {
       try {
         await this.ticketsService.markAsFailed(payment.ticketId);
@@ -81,7 +83,11 @@ export class TicketsWebhookService {
     this.logger.log(`handlePaymentWebhook paymentId=${paymentId} status=${status}`);
     if (status === PaymentStatus.COMPLETED || status === PaymentStatus.SUCCESS) {
       await this.handlePaymentCompleted(paymentId);
-    } else if (status === PaymentStatus.FAILED || status === PaymentStatus.EXPIRED) {
+    } else if (
+      status === PaymentStatus.FAILED ||
+      status === PaymentStatus.EXPIRED ||
+      status === PaymentStatus.CANCELLED
+    ) {
       await this.handlePaymentFailed(paymentId);
     }
   }

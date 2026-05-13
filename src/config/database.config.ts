@@ -42,13 +42,14 @@ export const databaseConfig = (
       : [__dirname + '/../../migrations/*{.ts,.js}'],
     migrationsRun: false,
     migrationsTableName: 'migrations',
-    synchronize: true, // ⚠️ TEMPORAIRE: Activer pour la première production. DÉSACTIVER APRÈS LA PREMIÈRE SYNCHRONISATION !
+    synchronize: false,//true, // ⚠️ TEMPORAIRE: Activer pour la première production. DÉSACTIVER APRÈS LA PREMIÈRE SYNCHRONISATION !
     logging: isDevelopment,
     ssl: sslConfig,
     extra: {
       connectionTimeoutMillis: 10000,
       max: 10,
-      idleTimeoutMillis: 30000,
+      /** Garde-fou idle pool PG (connexions longues / pauses côté app). */
+      idleTimeoutMillis: 120000,
     },
     retryAttempts: 5,
     retryDelay: 3000,

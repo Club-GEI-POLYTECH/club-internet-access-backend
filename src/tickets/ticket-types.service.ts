@@ -2,7 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TicketType } from '../entities/ticket-type.entity';
-import { Ticket, TicketStatus } from '../entities/ticket.entity';
+import { Ticket } from '../entities/ticket.entity';
+import { andCatalogAvailableForTicket } from './catalog-available.query';
 
 @Injectable()
 export class TicketTypesService {
@@ -28,12 +29,11 @@ export class TicketTypesService {
     const types = await this.findAll();
     const typesWithCounts = await Promise.all(
       types.map(async (type) => {
-        const availableCount = await this.ticketsRepository.count({
-          where: {
-            ticketTypeId: type.id,
-            status: TicketStatus.AVAILABLE,
-          },
-        });
+        const availableCount = await andCatalogAvailableForTicket(
+          this.ticketsRepository
+            .createQueryBuilder('ticket')
+            .where('ticket.ticketTypeId = :tid', { tid: type.id }),
+        ).getCount();
 
         return {
           ...type,
@@ -60,12 +60,11 @@ export class TicketTypesService {
     if (!type) {
       throw new NotFoundException('Ticket type not found');
     }
-    const availableCount = await this.ticketsRepository.count({
-      where: {
-        ticketTypeId: id,
-        status: TicketStatus.AVAILABLE,
-      },
-    });
+    const availableCount = await andCatalogAvailableForTicket(
+      this.ticketsRepository
+        .createQueryBuilder('ticket')
+        .where('ticket.ticketTypeId = :tid', { tid: id }),
+    ).getCount();
     return { ...type, availableCount };
   }
 

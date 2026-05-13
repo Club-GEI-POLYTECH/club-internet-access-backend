@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { Payment, PaymentStatus } from '../entities/payment.entity';
 import { User } from '../entities/user.entity';
 import { Ticket, TicketStatus } from '../entities/ticket.entity';
+import { andCatalogAvailableForTicket } from '../tickets/catalog-available.query';
 
 @Injectable()
 export class DashboardService {
@@ -54,7 +55,7 @@ export class DashboardService {
       this.usersRepository.count(),
       this.usersRepository.count({ where: { isActive: true } }),
       this.ticketsRepository.count(),
-      this.ticketsRepository.count({ where: { status: TicketStatus.AVAILABLE } }),
+      andCatalogAvailableForTicket(this.ticketsRepository.createQueryBuilder('ticket')).getCount(),
       this.ticketsRepository.count({ where: { status: TicketStatus.SOLD } }),
       this.ticketsRepository.count({ where: { status: TicketStatus.RESERVED } }),
       this.ticketsRepository

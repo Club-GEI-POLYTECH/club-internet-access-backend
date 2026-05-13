@@ -1,7 +1,15 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Payment, PaymentStatus } from '../entities/payment.entity';
+import { Payment, PaymentMethod, PaymentStatus } from '../entities/payment.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UserRole } from '../entities/user.entity';
 import { TicketsWebhookService } from '../tickets/tickets-webhook.service';
@@ -32,7 +40,11 @@ export class PaymentService {
     return savedPayment;
   }
 
-  async completePayment(paymentId: string, transactionId?: string): Promise<Payment> {
+  async completePayment(
+    paymentId: string,
+    transactionId: string | undefined,
+    auth: { userId: string; role: UserRole },
+  ): Promise<Payment> {
     this.logger.log(`completePayment paymentId=${paymentId} transactionId=${transactionId ?? 'none'}`);
     const payment = await this.paymentRepository.findOne({
       where: { id: paymentId },
@@ -40,7 +52,36 @@ export class PaymentService {
     });
 
     if (!payment) {
-      throw new Error('Payment not found');
+      throw new NotFoundException('Paiement introuvable');
+    }
+
+    if (auth.role === UserRole.STUDENT) {
+      if (payment.createdById !== auth.userId) {
+        throw new ForbiddenException('Ce paiement ne correspond pas à votre compte');
+      }
+      if (payment.method === PaymentMethod.MOBILE_MONEY) {
+        if (
+          payment.status === PaymentStatus.PENDING ||
+          payment.status === PaymentStatus.PROCESSING
+        ) {
+          throw new BadRequestException(
+            'Pour Mobile Money Kelpay, finalisez avec POST /api/payments/:id/kelpay/confirm (le statut doit être « payé » côté Kelpay avant).',
+          );
+        }
+      }
+    }
+
+    if (payment.status === PaymentStatus.COMPLETED) {
+      return payment;
+    }
+
+    const terminalBad = [
+      PaymentStatus.FAILED,
+      PaymentStatus.EXPIRED,
+      PaymentStatus.CANCELLED,
+    ];
+    if (terminalBad.includes(payment.status)) {
+      throw new BadRequestException(`Impossible de compléter un paiement en statut « ${payment.status} »`);
     }
 
     payment.status = PaymentStatus.COMPLETED;
@@ -110,7 +151,9 @@ export class PaymentService {
     const savedPayment = await this.paymentRepository.save(payment);
 
     if (
-      (status === PaymentStatus.FAILED || status === PaymentStatus.EXPIRED) &&
+      (status === PaymentStatus.FAILED ||
+        status === PaymentStatus.EXPIRED ||
+        status === PaymentStatus.CANCELLED) &&
       savedPayment.ticketId
     ) {
       await this.ticketsWebhookService.handlePaymentFailed(savedPayment.id);

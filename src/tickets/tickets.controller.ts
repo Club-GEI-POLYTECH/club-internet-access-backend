@@ -113,10 +113,7 @@ export class TicketsController {
   async getMyTickets(@Request() req) {
     this.logger.log(`GET /tickets/me userId=${req.user?.userId}`);
     const tickets = await this.ticketsService.findForUser(req.user.userId);
-    return tickets.map((ticket) => ({
-      ...ticket,
-      password: '***',
-    }));
+    return Promise.all(tickets.map((t) => this.ticketsService.serializeTicketForOwner(t)));
   }
 
   @Get(':id')
@@ -223,7 +220,19 @@ export class TicketsController {
           type: 'string',
           format: 'binary',
           description:
-            'Fichier CSV Mikhmon (Username, Password, Profile, Time Limit, …). Type 24h/7j/30j selon Time Limit ; prix sur ticket_types (pas sur chaque ligne ticket).',
+            'Fichier CSV Mikhmon. Obligatoire : ticketTypeId **ou** catalogDuration. Les colonnes Time Limit / Data Limit ne fixent ni le TicketType ni timeLimit/dataLimit sur le ticket.',
+        },
+        catalogDuration: {
+          type: 'string',
+          enum: ['24h', '7j', '30j'],
+          description:
+            'Sans ticketTypeId : force le type catalogue pour tout le fichier. Ignoré si ticketTypeId est envoyé.',
+        },
+        ticketTypeId: {
+          type: 'string',
+          format: 'uuid',
+          description:
+            'UUID du TicketType. Tous les tickets importés sont liés à ce type ; prioritaire sur catalogDuration et sur la déduction CSV.',
         },
       },
     },
@@ -245,13 +254,13 @@ export class TicketsController {
       }),
     )
     file: any,
-    @Body() _importDto?: ImportTicketsDto,
+    @Body() importDto: ImportTicketsDto,
   ) {
     this.logger.log(
-      `POST /tickets/admin/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size}`,
+      `POST /tickets/admin/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size} ticketTypeId=${importDto?.ticketTypeId ?? '—'} catalogDuration=${importDto?.catalogDuration ?? 'auto'}`,
     );
     const csvContent = file.buffer.toString('utf-8');
-    return await this.ticketsService.importFromCSV(csvContent);
+    return await this.ticketsService.importFromCSV(csvContent, importDto);
   }
 
   @Post('admin/import/recommendations')

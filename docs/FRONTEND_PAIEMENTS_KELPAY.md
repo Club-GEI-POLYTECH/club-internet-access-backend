@@ -1,35 +1,76 @@
 # Instructions frontend — paiements (Mobile Money KELPAY)
 
-Ce document décrit comment intégrer l’achat avec **KELPAY** côté frontend (Next.js ou autre). Le backend confirme le paiement par **polling** sur `checktransaction` (pas de notification HTTP Kelpay vers cette API). Le frontend n’appelle **pas** `pay.keccel.com`.
+Ce document décrit comment intégrer l’achat avec **KELPAY** côté frontend (Next.js ou autre). Le backend appelle `pay.keccel.com` ; le frontend **n’appelle jamais** Kelpay directement. Après **`POST /payments/initiate`**, il **n’y a pas** de boucle `checktransaction` automatique côté serveur : le client enchaîne **`kelpay/verify`** puis **`kelpay/confirm`**, et peut appeler **`kelpay/cancel`** pour abandonner tant que le paiement est ouvert ; le **callback** Kelpay peut finaliser le paiement si l’URL est joignable.
 
 ## Prérequis
 
 - **JWT** valide (`Authorization: Bearer …`) pour toutes les routes ci-dessous sauf indication.
 - URL API : préfixe global **`/api`** (ex. `https://votre-api.com/api`).
 
-## Deux parcours possibles
+## Parcours possibles
 
-| Parcours | Route | Usage |
-|----------|--------|--------|
-| **Mobile Money (KELPAY)** | `POST /payments/initiate` | Utilisateur paie sur son téléphone (Orange, M-Pesa, Airtel, AfriMoney…). |
-| **Espèces / autre** (sans push MM) | `POST /tickets/purchase` avec `method: "cash"` | Flux classique : paiement créé en `pending`, complétion manuelle admin possible. |
+| Parcours | Routes principales | Usage |
+|----------|---------------------|--------|
+| **KELPAY — 3 actions** | `POST /payments/initiate` → `verify` → `confirm` | Le **front** déclenche chaque étape. Entre initiate et confirm, **`POST /payments/:paymentId/kelpay/cancel`** abandonne un paiement encore `pending` / `processing` et libère la ligne pour un autre achat. |
+| **Espèces / autre** (sans push MM) | `POST /tickets/purchase` avec `method: "cash"` | Paiement `pending`, complétion admin possible. |
 
-Pour KELPAY, **ne pas** appeler `POST /tickets/purchase` avec `mobile_money` si vous utilisez `initiate` : le ticket doit être **`available`** ; `initiate` réserve le ticket et crée le paiement.
+Pour KELPAY, **ne pas** appeler `POST /tickets/purchase` avec `mobile_money` si vous utilisez `initiate` : le ticket reste **`available`** mais est **exclu du catalogue** tant qu’un paiement Kelpay **`pending`/`processing`** existe sur cette ligne. Au **succès** (réponse Keccel **code 0** / statut transaction OK sur **`kelpay/verify`**, ou **`kelpay/confirm`**, ou **callback** Kelpay), le ticket passe en **`sold`**. Pour abandonner avant la finalisation : **`kelpay/cancel`** (paiement → `cancelled`).
 
 ---
 
-## 1. Flux KELPAY (recommandé)
+## 1. Les étapes KELPAY — à expliquer côté UI
 
-### Étapes UX
+Quatre **actions** possibles côté API (souvent trois boutons principaux + **Annuler**), **sans obligation d’enchaînement immédiat** :
 
-1. L’utilisateur **connecté** choisit un ticket listé via `GET /tickets/available` (ou par type).
-2. Afficher le **prix exact** du type (`ticket.ticketType.price` en CDF) — le backend refuse si `amount` ≠ ce prix.
-3. Saisie du **numéro Mobile Money** (format local ou `+243…`).
-4. Appeler **`POST /api/payments/initiate`** avec le corps JSON ci-dessous.
-5. Afficher un message du type : *« Validez le paiement sur votre téléphone (PIN) »*.
-6. **Rafraîchir le statut** du paiement côté API jusqu’à état terminal (voir plus bas).
+1. **Initier** — `POST /api/payments/initiate`  
+   - Envoie la demande Kelpay (push sur le téléphone).  
+   - Corps : `ticketId`, `phoneNumber`, `amount`, `userId` (aucun autre champ requis).  
+   - Réponse : `paymentId`, `merchantReference`, `transactionId`, `status: "pending"`.  
+   - **Persister** `paymentId` (state client, stockage local, ou retrouver via `GET /api/payments`).
 
-### Requête `POST /api/payments/initiate`
+2. **Vérifier** — `POST /api/payments/{paymentId}/kelpay/verify`  
+   - Un seul `checktransaction` côté serveur (doc Keccel : **`code` 0** = transaction réussie, **`code` 1** = échec ; `transactionstatus` ex. SUCCESS / FAILED / Delivered).  
+   - Si **succès** : le backend enregistre déjà le paiement en **`success`** et active le ticket (`readyToConfirm: false`).  
+   - Si **échec** : paiement **`failed`**, ticket libéré.  
+   - Si **encore en attente** : `paymentStatus` reste ouvert, `kelpayTransactionStatus` peut être `unknown` — réessayer plus tard.
+
+3. **Confirmer (optionnel / idempotent)** — `POST /api/payments/{paymentId}/kelpay/confirm`  
+   - Refait un `checktransaction` puis finalise si besoin. Utile si **verify** n’a pas été appelé ou en course avec le **callback**.  
+   - **Idempotent** : si `verify` (ou callback) a déjà tout finalisé, la réponse le signale (`alreadyFinalized: true`).  
+   - **409** si Kelpay n’a pas encore confirmé : inviter à réessayer Verify plus tard.
+
+4. **Annuler (optionnel)** — `POST /api/payments/{paymentId}/kelpay/cancel`  
+   - Tant que le paiement est **`pending`** ou **`processing`** (après initiate et/ou verify, sans confirm).  
+   - Passe le paiement en **`cancelled`** et libère la ligne pour un nouvel **`initiate`** (pas d’appel Kelpay côté serveur).  
+   - **400** si le paiement est déjà **`success`** / **`completed`**. **409** si un succès a été enregistré entre-temps (course avec callback / confirm).  
+   - Réponse : `paymentId`, `status`, `alreadyTerminal` (répéter sur un paiement déjà `failed` / `cancelled` → `alreadyTerminal: true`, **200**).
+
+### Les étapes ne sont pas « un seul bloc de temps »
+
+- L’utilisateur peut **initier**, **fermer l’app**, valider plus tard sur le téléphone, **rouvrir** l’app, lancer **Verify**, puis **Confirmer** encore plus tard.  
+- Le backend **n’exige pas** que les requêtes soient enchaînées dans la même session courte : tant que le paiement reste **ouvert** (`pending` / `processing`) et que Kelpay le permettent, Verify et Confirm restent pertinents ; **Cancel** peut interrompre dans cet état.  
+- **JWT** : à chaque appel Verify / Confirm / Cancel, le token doit être valide (reconnexion si besoin).  
+- **Callback** : Kelpay peut finaliser seul ; l’UI doit se baser sur `GET /payments/:id` ou la réponse de Confirm et ne pas supposer que seul Confirm provoque le `success`.  
+- **Abandon** : bouton « Annuler l’achat » → `kelpay/cancel` tant que le statut n’est pas final ; puis retour au catalogue ou autre ticket.
+
+### Textes suggérés pour l’utilisateur final (à adapter)
+
+| Moment | Exemple de message |
+|--------|---------------------|
+| Après Initier | *« Une demande de paiement a été envoyée sur votre numéro. Validez avec votre code PIN quand vous voulez. Vous pouvez quitter cet écran : votre achat reste en attente. »* |
+| Bouton Verify | *« Vérifier si le paiement a été accepté »* ou *« J’ai validé sur mon téléphone — vérifier »*. |
+| Verify encore en attente | *« Le réseau peut prendre quelques instants. Réessayez dans un moment ou après avoir bien terminé sur le téléphone. »* |
+| Verify succès (code 0 / statut OK) | *« Paiement confirmé, votre accès Wi‑Fi est activé. »* (`confirm` optionnel, idempotent.) |
+| Après Confirm | *« Votre ticket est activé. »* (puis instructions / `GET /tickets/me`). |
+| Annuler (optionnel) | *« Annuler cet achat et libérer le ticket »* — uniquement tant que le paiement n’est pas finalisé. |
+
+Le frontend doit **expliquer clairement** qu’il y a **plusieurs moments** (demande → vérification → confirmation, et éventuellement **annulation**) et que **l’utilisateur peut prendre son temps** entre ces moments tant que le paiement n’est pas terminé ou annulé.
+
+**Erreurs utiles** : `404` paiement introuvable ; `403` étudiant sur le paiement d’un autre utilisateur ; `400` paiement non éligible, Kelpay en échec, ou **cancel** sur un paiement déjà réussi ; `409` sur **confirm** lorsque Kelpay n’a pas encore confirmé (réessayer **verify** plus tard), ou **cancel** si un succès a été enregistré entre-temps.
+
+---
+
+## 2. Requête `POST /api/payments/initiate`
 
 **Headers :** `Content-Type: application/json`, `Authorization: Bearer <access_token>`
 
@@ -73,7 +114,7 @@ Exemple de forme (champs utiles) :
 ```
 
 - Le backend a déjà demandé à KELPAY d’envoyer la **push** sur le téléphone.
-- Conserver **`paymentId`** pour le suivi UI.
+- Conserver **`paymentId`** pour enchaîner verify / confirm.
 
 ### Erreurs fréquentes
 
@@ -85,36 +126,31 @@ Exemple de forme (champs utiles) :
 
 ---
 
-## 2. Suivi du paiement (polling côté frontend)
+## 3. Rafraîchir l’état (`GET /payments/:id`)
 
-Le serveur enchaîne automatiquement des appels **`checktransaction`** après l’initiation ; le frontend doit **mettre à jour l’UI** en relisant le paiement (`GET /payments/:id`).
+Le front **ne** attend **pas** un polling serveur après `initiate`. Il enchaîne **verify** puis **confirm**.
 
-**Option A — Détail paiement**
+`GET /api/payments/{paymentId}` (ou `GET /api/payments`) reste utile pour :
 
-`GET /api/payments/{paymentId}` (JWT ; un étudiant ne voit que ses paiements).
-
-**Option B — Liste**
-
-`GET /api/payments` puis filtrer par `paymentId`.
+- afficher l’historique / « paiement en attente » après réouverture de l’app ;
+- détecter qu’un **callback** Kelpay a déjà passé le paiement en `success` avant que l’utilisateur appuie sur Confirm (Confirm reste idempotent).
 
 ### Statuts à afficher (`payment.status`)
 
 | Statut | Signification côté UI |
 |--------|-------------------------|
-| `pending` | Push envoyée ou en attente de confirmation. |
-| `processing` | Vérification `checktransaction` en cours côté serveur. |
+| `pending` | Push envoyée ou en attente ; enchaîner verify / confirm ou attendre callback. |
+| `processing` | Transition possible selon le contexte ; continuer verify / confirm ou GET. |
 | `success` | Paiement confirmé ; le ticket passe **vendu** côté serveur. |
 | `failed` | Refus / erreur ; ticket **libéré** (re-disponible). |
-| `expired` | Délai / tentatives max atteints sans succès ; ticket libéré. |
+| `expired` | Délai / annulation métier ; ticket libéré si applicable. |
 | `completed` | Ancien flux manuel (ex. espèces complétées par admin) — peut coexister. |
-
-**Suggestion d’intervalle** : requête `GET /payments/:id` toutes les **3 à 5 secondes** pendant au plus **~90 secondes**, puis message du type *« Délai dépassé, vérifiez votre opérateur ou l’historique des paiements »*.
 
 Les champs `providerResponse` / `merchantReference` sont surtout pour le **support** ; pas besoin de les parser en production sur le front.
 
 ---
 
-## 3. Après succès (`success`)
+## 4. Après succès (`success`)
 
 - Les tickets achetés par l’utilisateur connecté : **`GET /api/tickets/me`** (JWT).
 - Le catalogue public : **`GET /api/tickets/available`** (le ticket vendu n’y figure plus).
@@ -122,15 +158,15 @@ Les champs `providerResponse` / `merchantReference` sont surtout pour le **suppo
 
 ---
 
-## 4. Variables d’environnement (rappel)
+## 5. Variables d’environnement (rappel)
 
 Côté **backend** uniquement : `KELPAY_MERCHANT_CODE`, `KELPAY_TOKEN`, éventuellement `KELPAY_CALLBACK_*` si la passerelle impose une URL (sinon vide). Le frontend ne contient **aucun** secret KELPAY.
 
 ---
 
-## 5. Référence code (copie dans le repo)
+## 6. Référence code (copie dans le repo)
 
-Types et appel d’exemple : `frontend-types.ts` (`InitiateKelpayPaymentRequest`, `InitiateKelpayPaymentResponse`) et `frontend-api-client.ts` (`apiClient.payments.initiateKelpay`).
+Types et appels : `frontend-types.ts` / `frontend-api-client.ts` — `initiateKelpay`, **`verifyKelpay`**, **`confirmKelpay`**, **`cancelKelpay`**, alignés sur le Swagger **Kelpay**.
 
 Swagger : tag **Kelpay** sur `/api` (document interactif).
 

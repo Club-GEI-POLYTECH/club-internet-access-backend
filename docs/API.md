@@ -106,9 +106,15 @@ Même logique que les routes admin sous `/api/tickets/admin/*` :
 
 | Méthode | Chemin | Auth | Description |
 |---------|--------|------|-------------|
-| POST | `/api/payments/initiate` | JWT | Initie KELPAY ; `amount` = `ticket.ticketType.price` |
+| POST | `/api/payments/initiate` | JWT | Initie KELPAY ; `amount` = `ticket.ticketType.price` ; envoie `callbackurl` (voir `.env`). Pas de `checktransaction` automatique : le client appelle `kelpay/verify` (et éventuellement `kelpay/confirm`, idempotent). Le ticket reste **`available`** mais est **exclu du catalogue** tant qu’un paiement Kelpay `pending`/`processing` existe sur la ligne ; **`kelpay/cancel`** libère la ligne (`cancelled`). Au succès (`kelpay/verify`, `kelpay/confirm` ou **callback**), ticket **`sold`**. |
+| POST | `/api/payments/:paymentId/kelpay/verify` | JWT | `checktransaction` (Keccel : **code 0** = succès, **1** = échec ; `transactionstatus`). Échec → `failed` + libération ticket. **Succès → `success` + ticket vendu** ; `confirm` reste idempotent. |
+| POST | `/api/payments/:paymentId/kelpay/confirm` | JWT | `checktransaction` + finalisation `success` / activation ticket (idempotent si déjà finalisé). |
+| POST | `/api/payments/:paymentId/kelpay/cancel` | JWT | Abandon côté app : `pending`/`processing` → `cancelled` ; libère le ticket pour un nouvel achat (pas d’appel Kelpay). |
+| POST | `/api/payments/callback` | Non | Webhook appelé par Kelpay ; corps JSON ou formulaire ; réponse **texte brut** `OK` |
 
-Le serveur confirme le paiement par **polling** `checktransaction` (pas de dépendance à un callback HTTP Kelpay pour ce projet). Voir aussi [FRONTEND_PAIEMENTS_KELPAY.md](./FRONTEND_PAIEMENTS_KELPAY.md).
+Configurer une URL **HTTPS publique** vers `POST /api/payments/callback` : **`KELPAY_CALLBACK_URL`** (recommandé), ou **`PUBLIC_API_URL`** / **`KELPAY_CALLBACK_BASE_URL`** + **`KELPAY_CALLBACK_PATH`** (défaut `/api/payments/callback`), ou **`RAILWAY_PUBLIC_DOMAIN`**. En développement sans base publique, une URL locale est utilisée pour satisfaire l’API Kelpay (tunnel ngrok si besoin de recevoir le POST).
+
+Après **`POST /payments/initiate`**, la réponse Kelpay avec `code: 0` signifie seulement « demande reçue » ; le statut final vient des appels **`checktransaction`** via **`kelpay/verify`** (doc : code 0/1 + `transactionstatus`) / **`kelpay/confirm`** (ou du **callback** HTTP Kelpay si configuré).
 
 ### Dashboard
 

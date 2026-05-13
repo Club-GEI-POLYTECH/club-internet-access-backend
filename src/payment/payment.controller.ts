@@ -17,21 +17,29 @@ export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post(':id/complete')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.AGENT)
   @ApiOperation({
     summary: 'Compléter un paiement (ex. ticket)',
-    description: 'Marque le paiement comme complété et finalise la vente du ticket si applicable',
+    description:
+      'Marque le paiement comme **complété** et finalise la vente du ticket si applicable. **Admin / agent** : tout paiement complétable. **Étudiant** : uniquement **ses** paiements ; espèces / carte en attente OK ; **Mobile Money Kelpay** encore `pending`/`processing` → utiliser `POST .../kelpay/confirm` ; si déjà `success` (Kelpay), cet appel peut passer le paiement en `completed` (idempotent si déjà `completed`).',
   })
   @ApiParam({ name: 'id', description: 'UUID du paiement' })
   @ApiBody({
     schema: { type: 'object', properties: { transactionId: { type: 'string', example: 'MTN123456' } } },
   })
   @ApiResponse({ status: 200, description: 'Paiement complété avec succès' })
+  @ApiResponse({ status: 400, description: 'Paiement non complétable ou Kelpay encore ouvert (étudiant)' })
+  @ApiResponse({ status: 403, description: 'Étudiant : paiement d’un autre utilisateur' })
   @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
-  async completePayment(@Param('id') id: string, @Body() body: { transactionId?: string }) {
+  async completePayment(
+    @Param('id') id: string,
+    @Body() body: { transactionId?: string },
+    @Request() req: { user: { userId: string; role: UserRole } },
+  ) {
     this.logger.log(`POST /payments/${id}/complete transactionId=${body?.transactionId ?? 'none'}`);
-    return await this.paymentService.completePayment(id, body.transactionId);
+    return await this.paymentService.completePayment(id, body.transactionId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
   }
 
   @Put(':id/status')
