@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { WiFiAccount } from './wifi-account.entity';
 import { Payment } from './payment.entity';
 
 export enum UserRole {
@@ -45,9 +44,6 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @OneToMany(() => WiFiAccount, (wifiAccount) => wifiAccount.createdBy)
-  wifiAccounts: WiFiAccount[];
-
   @OneToMany(() => Payment, (payment) => payment.createdBy)
   payments: Payment[];
 
@@ -57,4 +53,3 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

@@ -48,9 +48,6 @@ export class Ticket {
   })
   status: TicketStatus;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  price: number; // Prix de vente en CDF
-
   @Column({ type: 'timestamp', nullable: true })
   soldAt: Date; // Date de vente
 

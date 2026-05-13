@@ -1,26 +1,45 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+
+type MailPayload = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+};
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly transporter: nodemailer.Transporter;
   private readonly smtpConfigured: boolean;
+  private readonly resend: Resend | null;
+  /** Au moins un canal d’envoi utilisable (Resend ou SMTP). */
+  private readonly mailConfigured: boolean;
 
   constructor(private configService: ConfigService) {
-    const host = (this.configService.get<string>('SMTP_HOST') ?? '').trim() || 'mailhog';
+    const resendKey = (this.configService.get<string>('RESEND_API_KEY') ?? '').trim();
+    this.resend = resendKey ? new Resend(resendKey) : null;
+
+    const host = (this.configService.get<string>('SMTP_HOST') ?? '').trim() || 'localhost';
     const port = parseInt(this.configService.get<string>('SMTP_PORT') || '1025', 10);
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     const isLocalhost = !host || host === 'localhost' || host === '127.0.0.1';
-    // MailHog est considéré comme configuré (utilisé en local Docker)
     this.smtpConfigured = host === 'mailhog' || (!isProduction || !isLocalhost);
 
-    if (isProduction && !this.smtpConfigured) {
+    this.mailConfigured = !!this.resend || this.smtpConfigured;
+
+    if (isProduction && !this.mailConfigured) {
       this.logger.warn(
-        'SMTP non configuré pour la production (SMTP_HOST manquant ou localhost). ' +
-          'Définissez SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS dans Railway pour envoyer les emails.',
+        'Aucun envoi email configuré en production. Définissez RESEND_API_KEY ou SMTP_HOST / SMTP_PORT (hors localhost).',
       );
+    }
+
+    if (this.resend) {
+      this.logger.log('Emails : transport Resend (RESEND_API_KEY défini).');
     }
 
     this.transporter = nodemailer.createTransport({
@@ -37,17 +56,52 @@ export class NotificationsService {
     });
   }
 
+  private fromHeader(appName: string): string {
+    const addr =
+      (this.configService.get<string>('RESEND_FROM') ?? '').trim() ||
+      (this.configService.get<string>('SMTP_FROM') ?? '').trim() ||
+      'noreply@unikin.cd';
+    return `"${appName}" <${addr}>`;
+  }
+
+  private async dispatchMail(payload: MailPayload, context: string): Promise<void> {
+    if (this.resend) {
+      const { data, error } = await this.resend.emails.send({
+        from: payload.from,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+        text: payload.text,
+      });
+      if (error) {
+        this.logger.error(`Resend (${context}): ${error.message}`);
+        throw new Error(error.message);
+      }
+      this.logger.log(`✅ Resend OK id=${data?.id ?? '?'} (${context}) → ${payload.to}`);
+      return;
+    }
+
+    if (!this.smtpConfigured) {
+      const msg =
+        'SMTP non configuré en production. Définissez RESEND_API_KEY ou SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS.';
+      this.logger.error(msg);
+      throw new Error(msg);
+    }
+
+    await this.transporter.sendMail(payload);
+    this.logger.log(`✅ SMTP OK (${context}) → ${payload.to}`);
+  }
+
   async sendPasswordResetEmail(
     email: string,
     firstName: string,
     resetUrl: string,
   ): Promise<void> {
     this.logger.log(`sendPasswordResetEmail to=${email}`);
-    const fromEmail = this.configService.get<string>('SMTP_FROM', 'noreply@unikin.cd');
     const appName = this.configService.get<string>('APP_NAME', 'Club Internet Access UNIKIN');
 
-    const mailOptions = {
-      from: `"${appName}" <${fromEmail}>`,
+    const payload: MailPayload = {
+      from: this.fromHeader(appName),
       to: email,
       subject: 'Réinitialisation de votre mot de passe',
       html: `
@@ -106,20 +160,63 @@ export class NotificationsService {
       `,
     };
 
-    if (!this.smtpConfigured) {
+    if (!this.mailConfigured) {
       const msg =
-        'SMTP non configuré en production. Définissez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans Railway (voir RAILWAY_VARIABLES.md).';
+        'Aucun transport email (Resend ou SMTP). Définissez RESEND_API_KEY ou la configuration SMTP.';
       this.logger.error(msg);
       throw new Error(msg);
     }
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`✅ Email de réinitialisation envoyé à: ${email}`);
+      await this.dispatchMail(payload, 'password-reset');
     } catch (error: any) {
       this.logger.error(`❌ Erreur lors de l'envoi de l'email à ${email}: ${error.message}`);
       throw error;
     }
   }
-}
 
+  async sendRegistrationVerificationEmail(
+    email: string,
+    firstName: string,
+    code: string,
+  ): Promise<void> {
+    this.logger.log(`sendRegistrationVerificationEmail to=${email}`);
+    const appName = this.configService.get<string>('APP_NAME', 'Club Internet Access UNIKIN');
+    const mins = this.configService.get<string>('REGISTRATION_CODE_EXPIRES_MINUTES', '15');
+
+    const payload: MailPayload = {
+      from: this.fromHeader(appName),
+      to: email,
+      subject: `Votre code d’inscription — ${appName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <p>Bonjour ${firstName},</p>
+          <p>Voici votre code de vérification pour finaliser la création de votre compte <strong>${appName}</strong> :</p>
+          <p style="font-size: 28px; letter-spacing: 8px; font-weight: bold; color: #1e40af;">${code}</p>
+          <p>Ce code est valable <strong>${mins} minutes</strong>.</p>
+          <p>Si vous n’avez pas demandé ce compte, ignorez cet email.</p>
+          <p>Cordialement,<br>L’équipe ${appName}</p>
+        </body>
+        </html>
+      `,
+      text: `Bonjour ${firstName},\n\nCode de vérification : ${code}\n\nValable ${mins} minutes.\n\n— ${appName}`,
+    };
+
+    if (!this.mailConfigured) {
+      const msg =
+        'Aucun transport email (Resend ou SMTP). Définissez RESEND_API_KEY ou la configuration SMTP.';
+      this.logger.error(msg);
+      throw new Error(msg);
+    }
+
+    try {
+      await this.dispatchMail(payload, 'registration-code');
+    } catch (error: any) {
+      this.logger.error(`❌ Erreur envoi email inscription ${email}: ${error.message}`);
+      throw error;
+    }
+  }
+}

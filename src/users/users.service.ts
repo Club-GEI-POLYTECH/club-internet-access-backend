@@ -33,7 +33,7 @@ export class UsersService {
   async findAll(): Promise<User[]> {
     this.logger.log('findAll users');
     return await this.usersRepository.find({
-      relations: ['wifiAccounts', 'payments'],
+      relations: ['payments'],
     });
   }
 
@@ -41,7 +41,7 @@ export class UsersService {
     this.logger.log(`findOne user id=${id}`);
     return await this.usersRepository.findOne({
       where: { id },
-      relations: ['wifiAccounts', 'payments'],
+      relations: ['payments'],
     });
   }
 
@@ -79,6 +79,29 @@ export class UsersService {
 
   async verifyPassword(user: User, password: string): Promise<boolean> {
     return await bcrypt.compare(password, user.password);
+  }
+
+  /** Crée un étudiant avec mot de passe déjà hashé (après vérification email). */
+  async createStudentWithPasswordHash(data: {
+    email: string;
+    passwordHash: string;
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+  }): Promise<User> {
+    this.logger.log(`createStudentWithPasswordHash email=${data.email}`);
+    const user = this.usersRepository.create({
+      email: data.email,
+      password: data.passwordHash,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone ?? undefined,
+      role: UserRole.STUDENT,
+      isActive: true,
+    });
+    const saved = await this.usersRepository.save(user);
+    this.logger.log(`student created id=${saved.id}`);
+    return saved;
   }
 }
 

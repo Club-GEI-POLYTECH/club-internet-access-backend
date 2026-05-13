@@ -2,8 +2,10 @@ import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus, 
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterRequestDto } from './dto/register-request.dto';
+import { RegisterVerifyDto } from './dto/register-verify.dto';
+import { RegisterResendDto } from './dto/register-resend.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -15,15 +17,49 @@ export class AuthController {
 
   constructor(private authService: AuthService) {}
 
-  @Post('register')
-  @ApiOperation({ summary: 'Créer un compte utilisateur', description: 'Permet de créer un nouveau compte utilisateur' })
-  @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'Compte créé avec succès' })
-  @ApiResponse({ status: 400, description: 'Erreur de validation' })
-  @ApiResponse({ status: 409, description: 'Email déjà utilisé' })
-  async register(@Body() registerDto: RegisterDto) {
-    this.logger.log(`POST /auth/register email=${registerDto.email}`);
-    return this.authService.register(registerDto);
+  @Post('register/request')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Demander une inscription (étape 1)',
+    description:
+      'Valide l’email et envoie un code à 6 chiffres. Le compte n’est créé qu’après POST /auth/register/verify.',
+  })
+  @ApiBody({ type: RegisterRequestDto })
+  @ApiResponse({ status: 200, description: 'Code envoyé (ou message générique)' })
+  @ApiResponse({ status: 400, description: 'Validation ou envoi email impossible' })
+  @ApiResponse({ status: 409, description: 'Email déjà enregistré' })
+  async registerRequest(@Body() dto: RegisterRequestDto) {
+    this.logger.log(`POST /auth/register/request email=${dto.email}`);
+    return this.authService.requestRegistration(dto);
+  }
+
+  @Post('register/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Vérifier le code et finaliser l’inscription (étape 2)',
+    description: 'Vérifie le code reçu par email puis crée le compte étudiant et retourne un JWT.',
+  })
+  @ApiBody({ type: RegisterVerifyDto })
+  @ApiResponse({ status: 200, description: 'Compte créé, token JWT' })
+  @ApiResponse({ status: 400, description: 'Code invalide, expiré ou trop de tentatives' })
+  @ApiResponse({ status: 409, description: 'Email déjà enregistré' })
+  async registerVerify(@Body() dto: RegisterVerifyDto) {
+    this.logger.log(`POST /auth/register/verify email=${dto.email}`);
+    return this.authService.verifyRegistration(dto);
+  }
+
+  @Post('register/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Renvoyer le code d’inscription',
+    description: 'Pour une demande d’inscription non expirée, génère un nouveau code et réinitialise les essais.',
+  })
+  @ApiBody({ type: RegisterResendDto })
+  @ApiResponse({ status: 200, description: 'Nouveau code envoyé' })
+  @ApiResponse({ status: 400, description: 'Aucune demande en cours ou expirée' })
+  async registerResend(@Body() dto: RegisterResendDto) {
+    this.logger.log(`POST /auth/register/resend email=${dto.email}`);
+    return this.authService.resendRegistrationCode(dto);
   }
 
   @UseGuards(LocalAuthGuard)

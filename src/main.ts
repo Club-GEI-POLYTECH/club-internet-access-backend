@@ -66,7 +66,16 @@ async function bootstrap() {
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('Club Internet Access API')
-    .setDescription('API REST pour la gestion d\'accès Wi-Fi via MikroTik RouterOS - Club Internet Access UNIKIN')
+    .setDescription(
+      [
+        'API vente de tickets Wi‑Fi (import CSV Mikhmon) — UNIKIN.',
+        '',
+        '**Prix** : stockés sur `ticket_types` (durées 24h / 7j / 30j), pas sur chaque ligne `tickets`.',
+        'Pour KELPAY, `amount` = `ticket.ticketType.price`.',
+        '',
+        'Documentation Markdown : voir `docs/API.md` dans le dépôt.',
+      ].join('\n'),
+    )
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -80,16 +89,13 @@ async function bootstrap() {
       'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
     )
     .addTag('Auth', 'Endpoints d\'authentification')
-    .addTag('WiFi Accounts', 'Gestion des comptes Wi-Fi')
-    .addTag('Payments', 'Gestion des paiements')
-    .addTag('Sessions', 'Gestion des sessions actives')
-    .addTag('Dashboard', 'Statistiques et dashboard')
-    .addTag('MikroTik', 'Contrôle RouterOS MikroTik')
+    .addTag('Payments', 'Paiements liés aux ventes de tickets')
+    .addTag('Kelpay', 'Mobile Money KELPAY — POST /payments/initiate (polling serveur checktransaction)')
+    .addTag('Dashboard', 'Statistiques vente de tickets')
     .addTag('Users', 'Gestion des utilisateurs système')
-    .addTag('Bandwidth', 'Statistiques de bande passante')
     .addTag('App', 'Endpoints publics')
-    .addTag('Tickets', 'Vente et import de tickets Wi-Fi (Mikhmon)')
-    .addTag('Tickets (Admin)', 'Import et gestion des tickets (admin)')
+    .addTag('Tickets', 'Vente et consultation des tickets (public + authentifié)')
+    .addTag('Tickets (Admin)', 'Import CSV et gestion des tickets (admin)')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);
@@ -126,12 +132,9 @@ async function bootstrap() {
     logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
     
     // Afficher les infos DB de manière sécurisée
-    const pgHost = configService.get<string>('PGHOST');
-    const dbHost = configService.get<string>('DB_HOST');
-    if (pgHost) {
-      logger.log(`📊 Database: Connected via PG* variables (Railway)`);
-    } else if (dbHost) {
-      logger.log(`📊 Database: Connected via DB_* variables`);
+    const databaseUrl = configService.get<string>('DATABASE_URL');
+    if (databaseUrl) {
+      logger.log('📊 Database: Connected via DATABASE_URL');
     }
   } else {
     // Logs développement (détaillés)
@@ -141,17 +144,15 @@ async function bootstrap() {
     logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
     
     // Afficher les infos DB en développement
-    const pgHost = configService.get<string>('PGHOST');
-    const pgPort = configService.get<number>('PGPORT');
-    const pgDatabase = configService.get<string>('PGDATABASE');
-    const dbHost = configService.get<string>('DB_HOST');
-    const dbPort = configService.get<number>('DB_PORT');
-    const dbName = configService.get<string>('DB_DATABASE') || configService.get<string>('DB_NAME');
-    
-    if (pgHost) {
-      logger.log(`📊 Database: ${pgHost}:${pgPort || 5432}/${pgDatabase} (PG* variables)`);
-    } else if (dbHost) {
-      logger.log(`📊 Database: ${dbHost}:${dbPort || 5432}/${dbName || 'internet_access'} (DB_* variables)`);
+    const databaseUrl = configService.get<string>('DATABASE_URL');
+    if (databaseUrl) {
+      try {
+        const parsedUrl = new URL(databaseUrl);
+        const dbName = parsedUrl.pathname.replace(/^\//, '') || 'unknown';
+        logger.log(`📊 Database: ${parsedUrl.hostname}:${parsedUrl.port || '5432'}/${dbName} (DATABASE_URL)`);
+      } catch {
+        logger.warn('⚠️ DATABASE_URL invalide (non parsable).');
+      }
     }
   }
 }

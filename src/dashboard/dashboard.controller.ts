@@ -16,8 +16,11 @@ export class DashboardController {
 
   @Get('my-stats')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Mes statistiques', description: 'Comptes Wi-Fi et paiements de l\'utilisateur connecté (tous rôles: Admin, Agent, Étudiant)' })
-  @ApiResponse({ status: 200, description: 'wifiAccountsCount, paymentsCount' })
+  @ApiOperation({
+    summary: 'Mes statistiques',
+    description: 'Nombre de paiements liés au compte connecté (utile pour suivi interne)',
+  })
+  @ApiResponse({ status: 200, description: '{ paymentsCount }' })
   async getMyStats(@Request() req: { user: { userId: string } }) {
     this.logger.log(`GET /dashboard/my-stats userId=${req.user.userId}`);
     return await this.dashboardService.getMyStats(req.user.userId);
@@ -26,7 +29,10 @@ export class DashboardController {
   @Get('stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.AGENT)
-  @ApiOperation({ summary: 'Statistiques globales du dashboard', description: 'Statistiques globales (comptes, paiements, sessions, tickets) - ADMIN/AGENT uniquement' })
+  @ApiOperation({
+    summary: 'Statistiques vente de tickets',
+    description: 'Paiements, tickets (stock / vendus), utilisateurs — ADMIN/AGENT',
+  })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {
     this.logger.log('GET /dashboard/stats');
@@ -36,12 +42,15 @@ export class DashboardController {
   @Get('charts')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.AGENT)
-  @ApiOperation({ summary: 'Données pour graphiques', description: 'Données pour graphiques du dashboard - ADMIN/AGENT uniquement' })
+  @ApiOperation({
+    summary: 'Graphiques (tickets & paiements)',
+    description: 'Séries temporelles : paiements complétés et tickets vendus — ADMIN/AGENT',
+  })
   @ApiQuery({ name: 'days', required: false, description: 'Nombre de jours (défaut: 7)', example: 30 })
   @ApiResponse({ status: 200, description: 'Données récupérées avec succès' })
   async getCharts(@Query('days') days?: string) {
     this.logger.log(`GET /dashboard/charts days=${days ?? '7'}`);
-    const daysNumber = days ? parseInt(days) : 7;
+    const daysNumber = days ? parseInt(days, 10) : 7;
     return await this.dashboardService.getChartData(daysNumber);
   }
 }

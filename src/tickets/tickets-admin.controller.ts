@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Delete,
   Param,
   Body,
@@ -44,7 +43,7 @@ export class TicketsAdminController {
   @Post('import')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Importe des tickets depuis un fichier CSV (Admin)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -54,12 +53,7 @@ export class TicketsAdminController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Fichier CSV avec les tickets',
-        },
-        defaultPrice: {
-          type: 'number',
-          description: 'Prix par défaut pour les tickets sans type',
-          example: 5000,
+          description: 'CSV Mikhmon — prix selon Time Limit (24h / 7d / 30d), variables TICKET_PRICE_*',
         },
       },
     },
@@ -78,19 +72,19 @@ export class TicketsAdminController {
       }),
     )
     file: any,
-    @Body() importDto?: ImportTicketsDto,
+    @Body() _importDto?: ImportTicketsDto,
   ) {
     this.logger.log(
       `POST /admin/tickets/import filename=${file?.originalname} mimetype=${file?.mimetype} size=${file?.size}`,
     );
     const csvContent = file.buffer.toString('utf-8');
-    return await this.ticketsService.importFromCSV(csvContent, importDto?.defaultPrice);
+    return await this.ticketsService.importFromCSV(csvContent);
   }
 
   @Get('stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Statistiques sur les tickets (Admin)' })
   @ApiResponse({ status: 200, description: 'Statistiques des tickets' })
   async getStats() {
@@ -98,26 +92,10 @@ export class TicketsAdminController {
     return await this.ticketsService.getStats();
   }
 
-  @Put(':id/price')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Modifie le prix d\'un ticket (Admin)' })
-  @ApiResponse({ status: 200, description: 'Prix modifié' })
-  @ApiResponse({ status: 404, description: 'Ticket non trouvé' })
-  async updatePrice(@Param('id') id: string, @Body('price') price: number) {
-    this.logger.log(`PUT /admin/tickets/${id}/price price=${price}`);
-    const ticket = await this.ticketsService.updatePrice(id, price);
-    return {
-      ...ticket,
-      password: '***',
-    };
-  }
-
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Supprime un ticket (Admin)' })
   @ApiResponse({ status: 200, description: 'Ticket supprimé' })
   @ApiResponse({ status: 404, description: 'Ticket non trouvé' })

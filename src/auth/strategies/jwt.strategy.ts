@@ -10,10 +10,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     private usersService: UsersService,
   ) {
+    const secret = (configService.get<string>('JWT_SECRET') ?? '').trim();
+    if (!secret) {
+      throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.example).');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'your-secret-key'),
+      secretOrKey: secret,
     });
   }
 
@@ -25,4 +29,3 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return { userId: user.id, email: user.email, role: user.role };
   }
 }
-

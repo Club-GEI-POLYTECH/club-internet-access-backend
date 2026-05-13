@@ -31,7 +31,10 @@ export class TicketsWebhookService {
       return;
     }
 
-    if (payment.ticketId && payment.status === PaymentStatus.COMPLETED) {
+    if (
+      payment.ticketId &&
+      (payment.status === PaymentStatus.COMPLETED || payment.status === PaymentStatus.SUCCESS)
+    ) {
       try {
         await this.ticketsService.markAsSold(
           payment.ticketId,
@@ -58,7 +61,10 @@ export class TicketsWebhookService {
       return;
     }
 
-    if (payment.ticketId && payment.status === PaymentStatus.FAILED) {
+    if (
+      payment.ticketId &&
+      (payment.status === PaymentStatus.FAILED || payment.status === PaymentStatus.EXPIRED)
+    ) {
       try {
         await this.ticketsService.markAsFailed(payment.ticketId);
         this.logger.log(`✅ Ticket ${payment.ticketId} released after payment failure`);
@@ -73,9 +79,9 @@ export class TicketsWebhookService {
    */
   async handlePaymentWebhook(paymentId: string, status: PaymentStatus): Promise<void> {
     this.logger.log(`handlePaymentWebhook paymentId=${paymentId} status=${status}`);
-    if (status === PaymentStatus.COMPLETED) {
+    if (status === PaymentStatus.COMPLETED || status === PaymentStatus.SUCCESS) {
       await this.handlePaymentCompleted(paymentId);
-    } else if (status === PaymentStatus.FAILED) {
+    } else if (status === PaymentStatus.FAILED || status === PaymentStatus.EXPIRED) {
       await this.handlePaymentFailed(paymentId);
     }
   }

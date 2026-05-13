@@ -1,12 +1,18 @@
 {
   "info": {
     "name": "Club Internet Access API",
-    "description": "API REST pour la gestion d'accès Wi-Fi via MikroTik RouterOS - Club Internet Access UNIKIN",
+    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:4000" },
-    { "key": "token", "value": "" }
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "ticketId", "value": "" },
+    { "key": "typeId", "value": "" },
+    { "key": "transactionId", "value": "MTN123456" },
+    { "key": "merchantReference", "value": "" }
   ],
   "item": [
     {
@@ -34,15 +40,53 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Register",
+          "name": "Register request (code email)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+243900000000\",\n  \"role\": \"agent\"\n}"
+              "raw": "{\n  \"email\": \"student@student.unikin.cd\",\n  \"password\": \"password123\",\n  \"firstName\": \"Jean\",\n  \"lastName\": \"Test\",\n  \"phone\": \"+243900000000\"\n}"
             },
-            "url": "{{baseUrl}}/api/auth/register"
+            "url": "{{baseUrl}}/api/auth/register/request"
+          }
+        },
+        {
+          "name": "Register verify (JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token', json.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@student.unikin.cd\",\n  \"code\": \"123456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register/verify"
+          }
+        },
+        {
+          "name": "Register resend code",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@student.unikin.cd\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register/resend"
           }
         },
         {
@@ -63,7 +107,7 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"admin@unikin.cd\",\n  \"password\": \"admin123\"\n}"
@@ -75,7 +119,7 @@
           "name": "Profile",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/auth/profile"
           }
         },
@@ -83,10 +127,10 @@
           "name": "Forgot Password",
           "request": {
             "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\"\n}"
+              "raw": "{\n  \"email\": \"admin@unikin.cd\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/forgot-password"
           }
@@ -95,10 +139,10 @@
           "name": "Reset Password",
           "request": {
             "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"reset-token-123456\",\n  \"newPassword\": \"newPassword123\"\n}"
+              "raw": "{\n  \"token\": \"reset-token-from-email\",\n  \"newPassword\": \"newPassword123\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/reset-password"
           }
@@ -112,7 +156,7 @@
           "name": "List Users",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/users"
           }
         },
@@ -120,7 +164,7 @@
           "name": "Get User",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/users/{{userId}}"
           }
         },
@@ -129,12 +173,12 @@
           "request": {
             "method": "POST",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"agent@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"role\": \"agent\"\n}"
+              "raw": "{\n  \"email\": \"agent@unikin.cd\",\n  \"password\": \"password123\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"role\": \"agent\"\n}"
             },
             "url": "{{baseUrl}}/api/users"
           }
@@ -144,12 +188,12 @@
           "request": {
             "method": "PUT",
             "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"John Updated\",\n  \"phone\": \"+243999999999\"\n}"
+              "raw": "{\n  \"firstName\": \"John\",\n  \"phone\": \"+243999999999\"\n}"
             },
             "url": "{{baseUrl}}/api/users/{{userId}}"
           }
@@ -158,337 +202,8 @@
           "name": "Delete User",
           "request": {
             "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/users/{{userId}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "WiFi Accounts",
-      "item": [
-        {
-          "name": "Create WiFi Account",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"username\": \"etu9832\",\n  \"duration\": \"24h\",\n  \"bandwidthProfile\": \"2mbps\",\n  \"maxDevices\": 1,\n  \"comment\": \"Compte étudiant\"\n}"
-            },
-            "url": "{{baseUrl}}/api/wifi-accounts"
-          }
-        },
-        {
-          "name": "List WiFi Accounts",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/wifi-accounts"
-          }
-        },
-        {
-          "name": "List Active WiFi Accounts",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/wifi-accounts/active"
-          }
-        },
-        {
-          "name": "Get WiFi Account",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/wifi-accounts/{{wifiAccountId}}"
-          }
-        },
-        {
-          "name": "Delete WiFi Account",
-          "request": {
-            "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/wifi-accounts/{{wifiAccountId}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Payments",
-      "item": [
-        {
-          "name": "Create Payment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 1000,\n  \"method\": \"mobile_money\",\n  \"transactionId\": \"MTN123456\",\n  \"phoneNumber\": \"+243900000000\",\n  \"wifiAccountId\": \"uuid\",\n  \"ticketId\": \"uuid\",\n  \"notes\": \"Paiement étudiant\"\n}"
-            },
-            "url": "{{baseUrl}}/api/payments"
-          }
-        },
-        {
-          "name": "Complete Payment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"transactionId\": \"MTN123456\"\n}"
-            },
-            "url": "{{baseUrl}}/api/payments/{{paymentId}}/complete"
-          }
-        },
-        {
-          "name": "Update Payment Status",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"completed\"\n}"
-            },
-            "url": "{{baseUrl}}/api/payments/{{paymentId}}/status"
-          }
-        },
-        {
-          "name": "List Payments",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/payments"
-          }
-        },
-        {
-          "name": "Get Payment",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/payments/{{paymentId}}"
-          }
-        },
-        {
-          "name": "Get Payment by Transaction ID",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/payments/transaction/MTN123456"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Sessions",
-      "item": [
-        {
-          "name": "List Sessions",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions"
-          }
-        },
-        {
-          "name": "List Active Sessions",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions/active"
-          }
-        },
-        {
-          "name": "Sessions Statistics",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions/statistics"
-          }
-        },
-        {
-          "name": "Sync Sessions",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions/sync"
-          }
-        },
-        {
-          "name": "Sessions by WiFi Account",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions/wifi-account/{{wifiAccountId}}"
-          }
-        },
-        {
-          "name": "Get Session",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/sessions/{{sessionId}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Dashboard",
-      "item": [
-        {
-          "name": "My Stats",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/dashboard/my-stats"
-          }
-        },
-        {
-          "name": "Stats (Admin/Agent)",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/dashboard/stats"
-          }
-        },
-        {
-          "name": "Charts",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/dashboard/charts?days=30"
-          }
-        }
-      ]
-    },
-    {
-      "name": "MikroTik",
-      "item": [
-        {
-          "name": "Status",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/status"
-          }
-        },
-        {
-          "name": "Create MikroTik User",
-          "request": {
-            "method": "POST",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"etu9832\",\n  \"password\": \"X9fP2\",\n  \"profile\": \"2mbps\"\n}"
-            },
-            "url": "{{baseUrl}}/api/mikrotik/users"
-          }
-        },
-        {
-          "name": "List MikroTik Users",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/users"
-          }
-        },
-        {
-          "name": "Get MikroTik User",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/users/etu9832"
-          }
-        },
-        {
-          "name": "Delete MikroTik User",
-          "request": {
-            "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/users/etu9832"
-          }
-        },
-        {
-          "name": "Active Users",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/active"
-          }
-        },
-        {
-          "name": "Disconnect User",
-          "request": {
-            "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/active/{{sessionId}}"
-          }
-        },
-        {
-          "name": "Disable User",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/users/etu9832/disable"
-          }
-        },
-        {
-          "name": "Enable User",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/mikrotik/users/etu9832/enable"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Bandwidth",
-      "item": [
-        {
-          "name": "Realtime",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/bandwidth/realtime"
-          }
-        },
-        {
-          "name": "Stats",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/bandwidth/stats"
-          }
-        },
-        {
-          "name": "User Bandwidth",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/bandwidth/user/etu9832"
-          }
-        },
-        {
-          "name": "History",
-          "request": {
-            "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
-            "url": "{{baseUrl}}/api/bandwidth/history?days=30"
           }
         }
       ]
@@ -554,9 +269,28 @@
         },
         {
           "name": "Purchase Ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (json.payment && json.payment.id) {",
+                  "    pm.collectionVariables.set('paymentId', json.payment.id);",
+                  "  }",
+                  "  if (json.ticket && json.ticket.id) {",
+                  "    pm.collectionVariables.set('ticketId', json.ticket.id);",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"method\": \"mobile_money\"\n}"
@@ -581,16 +315,25 @@
           }
         },
         {
+          "name": "Webhook Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentId\": \"{{paymentId}}\",\n  \"status\": \"completed\",\n  \"transactionId\": \"{{transactionId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/tickets/webhook/payment"
+          }
+        },
+        {
           "name": "Admin - Import Tickets (CSV)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "body": {
               "mode": "formdata",
-              "formdata": [
-                {"key": "file", "type": "file", "src": ""},
-                {"key": "defaultPrice", "value": "5000", "type": "text"}
-              ]
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
             },
             "url": "{{baseUrl}}/api/tickets/admin/import"
           }
@@ -599,61 +342,32 @@
           "name": "Admin - Stats",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/tickets/admin/stats"
-          }
-        },
-        {
-          "name": "Admin - Update Ticket Price",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"price\": 5000\n}"
-            },
-            "url": "{{baseUrl}}/api/tickets/admin/{{ticketId}}/price"
           }
         },
         {
           "name": "Admin - Delete Ticket",
           "request": {
             "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/tickets/admin/{{ticketId}}"
-          }
-        },
-        {
-          "name": "Webhook Payment",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"paymentId\": \"123e4567-e89b-12d3-a456-426614174000\",\n  \"status\": \"completed\",\n  \"transactionId\": \"MTN123456\"\n}"
-            },
-            "url": "{{baseUrl}}/api/tickets/webhook/payment"
           }
         }
       ]
     },
     {
       "name": "Admin Tickets (alt path)",
+      "description": "Même logique que `/api/tickets/admin/*` pour les frontends qui appellent `/api/admin/tickets/*`.",
       "item": [
         {
-          "name": "Import Tickets",
+          "name": "Import Tickets (CSV)",
           "request": {
             "method": "POST",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "body": {
               "mode": "formdata",
-              "formdata": [
-                {"key": "file", "type": "file", "src": ""},
-                {"key": "defaultPrice", "value": "5000", "type": "text"}
-              ]
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
             },
             "url": "{{baseUrl}}/api/admin/tickets/import"
           }
@@ -662,31 +376,133 @@
           "name": "Stats",
           "request": {
             "method": "GET",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/admin/tickets/stats"
-          }
-        },
-        {
-          "name": "Update Ticket Price",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {"key": "Authorization", "value": "Bearer {{token}}"},
-              {"key": "Content-Type", "value": "application/json"}
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"price\": 5000\n}"
-            },
-            "url": "{{baseUrl}}/api/admin/tickets/{{ticketId}}/price"
           }
         },
         {
           "name": "Delete Ticket",
           "request": {
             "method": "DELETE",
-            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/admin/tickets/{{ticketId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "description": "Paiements : achat `POST /tickets/purchase`, KELPAY `POST /payments/initiate` (polling serveur checktransaction), complétion admin.",
+      "item": [
+        {
+          "name": "KELPAY Initiate (Mobile Money)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.paymentId) { pm.collectionVariables.set('paymentId', json.paymentId); }",
+                  "if (json.merchantReference) { pm.collectionVariables.set('merchantReference', json.merchantReference); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"amount\": 1000,\n  \"userId\": \"{{userId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/initiate"
+          }
+        },
+        {
+          "name": "List Payments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/payments"
+          }
+        },
+        {
+          "name": "Get Payment by Transaction ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/payments/transaction/{{transactionId}}"
+          }
+        },
+        {
+          "name": "Get Payment",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}"
+          }
+        },
+        {
+          "name": "Complete Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{transactionId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}/complete"
+          }
+        },
+        {
+          "name": "Update Payment Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"failed\"\n}"
+            },
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "My Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/dashboard/my-stats"
+          }
+        },
+        {
+          "name": "Stats (Admin/Agent)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/dashboard/stats"
+          }
+        },
+        {
+          "name": "Charts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/dashboard/charts?days=30"
           }
         }
       ]

@@ -1,10 +1,9 @@
--- Script SQL pour insérer des données de test
--- ⚠️ ATTENTION: Ce script utilise un hash bcrypt fixe pour "password123"
--- Pour un hash unique et sécurisé, UTILISEZ LE SCRIPT TYPESCRIPT: npm run seed:admin
--- Le script TypeScript génère un hash unique à chaque exécution avec bcrypt
+-- Script SQL pour insérer des données de test (VESTIGE — non utilisé par scripts/seed.ps1 ni seed.sh).
+-- Préférez : npm run seed:admin (admin + 1 agent + 1 étudiant si SEED_DEV_PASSWORD).
+-- ⚠️ Ce fichier utilise un hash bcrypt fixe pour "password123" (moins sûr que le seed TypeScript).
 
 -- Hash bcrypt pour "password123" (utilisé pour tous les utilisateurs)
--- Ce hash est fixe et moins sécurisé que celui généré par le script TypeScript8q
+-- Ce hash est fixe et moins sécurisé que celui généré par le script TypeScript.
 
 -- 1. Utilisateurs
 -- Admin (déjà créé par seedAdmin, on vérifie juste)

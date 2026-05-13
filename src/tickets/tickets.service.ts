@@ -1,6 +1,14 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  OnModuleInit,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Ticket, TicketStatus } from '../entities/ticket.entity';
 import { TicketType } from '../entities/ticket-type.entity';
 import { Payment, PaymentStatus, PaymentMethod } from '../entities/payment.entity';
@@ -9,29 +17,61 @@ import * as crypto from 'crypto';
 // csv-parse sera installé via npm install csv-parse
 // Pour l'instant, on utilise une implémentation simple de parsing CSV
 
+export interface CsvTypeRecommendation {
+  typeKey: '24h' | '7j' | '30j';
+  typeLabel: string;
+  count: number;
+  sampleTimeLimit: string | null;
+  recommendedPrice: number;
+  action: 'use_existing' | 'create_new';
+  matchedTicketType: {
+    id: string;
+    name: string;
+    profile: string;
+    price: number;
+    timeLimit?: string;
+    dataLimit?: string;
+    isActive: boolean;
+  } | null;
+}
+
+export interface CsvImportTypeRecommendationsResult {
+  summary: {
+    totalRows: number;
+    uniqueTypes: number;
+  };
+  recommendations: CsvTypeRecommendation[];
+}
+
 @Injectable()
 export class TicketsService implements OnModuleInit {
   private readonly logger = new Logger(TicketsService.name);
-
-  // Prix par défaut selon le profil
-  private readonly DEFAULT_PRICES: Record<string, number> = {
-    TEST: 5000,
-    BASIC: 10000,
-    PREMIUM: 20000,
-  };
 
   constructor(
     @InjectRepository(Ticket)
     private ticketsRepository: Repository<Ticket>,
     @InjectRepository(TicketType)
     private ticketTypesRepository: Repository<TicketType>,
+    @Inject(forwardRef(() => PaymentService))
     private paymentService: PaymentService,
   ) {}
 
   async onModuleInit() {
-    // Écouter les changements de statut des paiements pour marquer les tickets comme vendus
-    // Cette logique peut être implémentée via un webhook ou un événement
     this.logger.log('✅ TicketsService initialized');
+  }
+
+  /**
+   * Prix catalogue (CDF) selon la durée (colonne « Time Limit » du CSV Mikhmon).
+   * Variables : TICKET_PRICE_24H, TICKET_PRICE_7D, TICKET_PRICE_30D
+   */
+  priceFromTimeLimit(timeLimitRaw: string): number {
+    const t = (timeLimitRaw || '').trim().toLowerCase().replace(/\s+/g, '');
+    const p24 = Number(process.env.TICKET_PRICE_24H ?? 1000);
+    const p7 = Number(process.env.TICKET_PRICE_7D ?? 3500);
+    const p30 = Number(process.env.TICKET_PRICE_30D ?? 9000);
+    if (t.includes('30')) return p30;
+    if (t.includes('7')) return p7;
+    return p24;
   }
 
   async findAll(status?: TicketStatus): Promise<Ticket[]> {
@@ -107,10 +147,11 @@ export class TicketsService implements OnModuleInit {
     await this.ticketsRepository.save(ticket);
 
     try {
+      const salePrice = this.getSalePrice(ticket);
       // Créer le paiement
       const payment = await this.paymentService.create(
         {
-          amount: ticket.price,
+          amount: salePrice,
           method,
           phoneNumber: normalizedPhone,
           ticketId: ticket.id,
@@ -179,6 +220,10 @@ export class TicketsService implements OnModuleInit {
   async markAsSold(ticketId: string, phoneNumber: string): Promise<Ticket> {
     this.logger.log(`markAsSold ticketId=${ticketId} soldTo=${phoneNumber}`);
     const ticket = await this.findOne(ticketId);
+    if (ticket.status === TicketStatus.SOLD) {
+      this.logger.log(`markAsSold idempotent (déjà vendu) ticketId=${ticketId}`);
+      return ticket;
+    }
     ticket.status = TicketStatus.SOLD;
     ticket.soldAt = new Date();
     ticket.soldTo = phoneNumber;
@@ -206,38 +251,26 @@ export class TicketsService implements OnModuleInit {
     });
   }
 
-  async importFromCSV(csvContent: string, defaultPrice?: number): Promise<{
+  async importFromCSV(csvContent: string): Promise<{
     imported: number;
     failed: number;
     errors: string[];
   }> {
     const lineCount = csvContent.split('\n').length;
     this.logger.log(
-      `importFromCSV start lines≈${lineCount} defaultPrice=${defaultPrice ?? 'none'}`,
+      `importFromCSV start lines≈${lineCount}`,
     );
     const errors: string[] = [];
     let imported = 0;
     let failed = 0;
 
     try {
-      // Parser CSV simple (ou utiliser csv-parse si installé)
-      const lines = csvContent.split('\n').filter(line => line.trim());
-      if (lines.length === 0) {
+      const records = this.parseCsvRecords(csvContent);
+      if (records.length === 0) {
         errors.push('CSV vide');
         this.logger.warn('importFromCSV: CSV vide');
         return { imported: 0, failed: 0, errors };
       }
-
-      // Première ligne = headers
-      const headers = lines[0].split(',').map(h => h.trim());
-      const records = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim());
-        const record: any = {};
-        headers.forEach((header, index) => {
-          record[header] = values[index] || '';
-        });
-        return record;
-      });
 
       for (const record of records) {
         try {
@@ -262,17 +295,15 @@ export class TicketsService implements OnModuleInit {
             continue;
           }
 
-          // Déterminer le prix
-          let price = defaultPrice || this.DEFAULT_PRICES[profile] || 5000;
-
-          // Chercher un type de ticket correspondant
-          let ticketType = await this.ticketTypesRepository.findOne({
-            where: { profile, isActive: true },
-          });
-
-          if (ticketType) {
-            price = ticketType.price;
-          }
+          const durationKey = (timeLimit || '').trim() || '24h';
+          const durationType = this.getDurationType(durationKey);
+          const price = this.priceFromTimeLimit(durationKey);
+          const ticketType = await this.ensureTicketTypeForRecord(
+            durationType,
+            timeLimit,
+            dataLimit,
+            price,
+          );
 
           // Chiffrer le mot de passe
           const encryptedPassword = await this.encryptPassword(password);
@@ -286,8 +317,7 @@ export class TicketsService implements OnModuleInit {
             dataLimit: dataLimit || null,
             comment,
             status: TicketStatus.AVAILABLE,
-            price,
-            ticketTypeId: ticketType?.id || null,
+            ticketTypeId: ticketType.id,
           });
 
           await this.ticketsRepository.save(ticket);
@@ -312,6 +342,62 @@ export class TicketsService implements OnModuleInit {
     return { imported, failed, errors };
   }
 
+  async getImportTypeRecommendations(
+    csvContent: string,
+  ): Promise<CsvImportTypeRecommendationsResult> {
+    const records = this.parseCsvRecords(csvContent);
+    const byDuration = new Map<'24h' | '7j' | '30j', { count: number; sampleTimeLimit: string | null }>();
+
+    for (const record of records) {
+      const timeLimit = record['Time Limit']?.trim() || null;
+      const durationType = this.getDurationType(timeLimit || '24h');
+      if (!byDuration.has(durationType)) {
+        byDuration.set(durationType, { count: 1, sampleTimeLimit: timeLimit });
+      } else {
+        byDuration.get(durationType)!.count += 1;
+      }
+    }
+
+    const recommendations: CsvTypeRecommendation[] = [];
+    for (const [durationType, info] of byDuration.entries()) {
+      const durationProfile = this.getDurationProfile(durationType);
+      const existing = await this.ticketTypesRepository.findOne({
+        where: { profile: durationProfile },
+      });
+      const recommendedPrice = this.priceFromTimeLimit(info.sampleTimeLimit || '24h');
+
+      recommendations.push({
+        typeKey: durationType,
+        typeLabel: this.getDurationLabel(durationType),
+        count: info.count,
+        sampleTimeLimit: info.sampleTimeLimit,
+        recommendedPrice,
+        action: existing ? 'use_existing' : 'create_new',
+        matchedTicketType: existing
+          ? {
+              id: existing.id,
+              name: existing.name,
+              profile: existing.profile,
+              price: Number(existing.price),
+              timeLimit: existing.timeLimit ?? undefined,
+              dataLimit: existing.dataLimit ?? undefined,
+              isActive: existing.isActive,
+            }
+          : null,
+      });
+    }
+
+    const order: Record<'24h' | '7j' | '30j', number> = { '24h': 1, '7j': 2, '30j': 3 };
+    recommendations.sort((a, b) => order[a.typeKey] - order[b.typeKey]);
+    return {
+      summary: {
+        totalRows: records.length,
+        uniqueTypes: recommendations.length,
+      },
+      recommendations,
+    };
+  }
+
   async getStats(): Promise<{
     total: number;
     available: number;
@@ -328,10 +414,13 @@ export class TicketsService implements OnModuleInit {
 
     const soldTickets = await this.ticketsRepository.find({
       where: { status: TicketStatus.SOLD },
-      select: ['price'],
+      relations: ['ticketType'],
     });
 
-    const revenue = soldTickets.reduce((sum, ticket) => sum + Number(ticket.price), 0);
+    const revenue = soldTickets.reduce(
+      (sum, ticket) => sum + (ticket.ticketType ? Number(ticket.ticketType.price) : 0),
+      0,
+    );
     this.logger.log(`getStats total=${total} available=${available} sold=${sold} reserved=${reserved} revenue=${revenue}`);
 
     return {
@@ -343,13 +432,6 @@ export class TicketsService implements OnModuleInit {
     };
   }
 
-  async updatePrice(id: string, price: number): Promise<Ticket> {
-    this.logger.log(`updatePrice id=${id} price=${price}`);
-    const ticket = await this.findOne(id);
-    ticket.price = price;
-    return await this.ticketsRepository.save(ticket);
-  }
-
   async remove(id: string): Promise<void> {
     this.logger.log(`remove ticket id=${id}`);
     const ticket = await this.findOne(id);
@@ -357,6 +439,14 @@ export class TicketsService implements OnModuleInit {
   }
 
   // Méthodes utilitaires
+
+  /** Prix de vente : toujours celui du `TicketType` lié. */
+  getSalePrice(ticket: Ticket): number {
+    if (!ticket.ticketType) {
+      throw new BadRequestException('Ticket sans type : impossible de déterminer le prix');
+    }
+    return Number(ticket.ticketType.price);
+  }
 
   private normalizePhoneNumber(phone: string): string {
     // Normaliser au format +243900000000
@@ -372,9 +462,13 @@ export class TicketsService implements OnModuleInit {
   }
 
   private getEncryptionKey(): string {
-    // Utiliser une clé depuis les variables d'environnement ou une clé par défaut
-    // En production, utilisez une clé sécurisée depuis les variables d'environnement
-    return process.env.TICKET_ENCRYPTION_KEY || 'default-encryption-key-change-in-production-32chars!!';
+    const key = (process.env.TICKET_ENCRYPTION_KEY ?? '').trim();
+    if (!key) {
+      throw new Error(
+        'TICKET_ENCRYPTION_KEY doit être défini dans le fichier .env (chiffrement des mots de passe des tickets).',
+      );
+    }
+    return key;
   }
 
   private encryptPassword(password: string): string {
@@ -412,5 +506,76 @@ export class TicketsService implements OnModuleInit {
       this.logger.error(`Failed to decrypt password: ${error.message}`);
       throw new Error('Failed to decrypt password');
     }
+  }
+
+  private parseCsvRecords(csvContent: string): any[] {
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      return [];
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim());
+      const record: any = {};
+      headers.forEach((header, index) => {
+        record[header] = values[index] || '';
+      });
+      return record;
+    });
+  }
+
+  private async ensureTicketTypeForRecord(
+    durationType: '24h' | '7j' | '30j',
+    timeLimit: string | null,
+    dataLimit: string | null,
+    price: number,
+  ): Promise<TicketType> {
+    const profile = this.getDurationProfile(durationType);
+    const label = this.getDurationLabel(durationType);
+    const existingType = await this.ticketTypesRepository.findOne({
+      where: { profile },
+    });
+    if (existingType) {
+      return existingType;
+    }
+
+    const created = this.ticketTypesRepository.create({
+      name: label,
+      profile,
+      description: `Type auto-créé depuis import CSV (durée: ${label})`,
+      timeLimit: this.getDurationTimeLimit(durationType) || timeLimit || null,
+      dataLimit: dataLimit || null,
+      price,
+      isActive: true,
+    });
+    const saved = await this.ticketTypesRepository.save(created);
+    this.logger.log(`TicketType auto-créé depuis CSV: duration=${durationType} id=${saved.id}`);
+    return saved;
+  }
+
+  private getDurationType(raw: string): '24h' | '7j' | '30j' {
+    const t = (raw || '').toLowerCase().replace(/\s+/g, '');
+    if (t.includes('30')) return '30j';
+    if (t.includes('7')) return '7j';
+    return '24h';
+  }
+
+  private getDurationLabel(durationType: '24h' | '7j' | '30j'): string {
+    if (durationType === '30j') return '30 jours';
+    if (durationType === '7j') return '7 jours';
+    return '24 heures';
+  }
+
+  private getDurationProfile(durationType: '24h' | '7j' | '30j'): string {
+    if (durationType === '30j') return 'DURATION_30J';
+    if (durationType === '7j') return 'DURATION_7J';
+    return 'DURATION_24H';
+  }
+
+  private getDurationTimeLimit(durationType: '24h' | '7j' | '30j'): string {
+    if (durationType === '30j') return '30d';
+    if (durationType === '7j') return '7d';
+    return '24h';
   }
 }

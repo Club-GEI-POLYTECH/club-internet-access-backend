@@ -10,19 +10,26 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PasswordResetToken } from '../entities/password-reset-token.entity';
+import { PendingRegistration } from '../entities/pending-registration.entity';
 
 @Module({
   imports: [
     UsersModule,
     NotificationsModule,
     PassportModule,
-    TypeOrmModule.forFeature([PasswordResetToken]),
+    TypeOrmModule.forFeature([PasswordResetToken, PendingRegistration]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'your-secret-key'),
-        signOptions: { expiresIn: '7d' },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = (configService.get<string>('JWT_SECRET') ?? '').trim();
+        if (!secret) {
+          throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.example).');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '7d' },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
@@ -31,4 +38,3 @@ import { PasswordResetToken } from '../entities/password-reset-token.entity';
   exports: [AuthService],
 })
 export class AuthModule {}
-

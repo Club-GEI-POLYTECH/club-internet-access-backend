@@ -7,15 +7,19 @@ import {
   ManyToOne,
   OneToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
-import { WiFiAccount } from './wifi-account.entity';
 import { User } from './user.entity';
 import { Ticket } from './ticket.entity';
 
+/** Statuts paiement — inclut le cycle KELPAY Mobile Money. */
 export enum PaymentStatus {
   PENDING = 'pending',
+  PROCESSING = 'processing',
+  SUCCESS = 'success',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  EXPIRED = 'expired',
   CANCELLED = 'cancelled',
 }
 
@@ -46,17 +50,17 @@ export class Payment {
   })
   method: PaymentMethod;
 
+  /** Identifiant transaction côté KELPAY (retourné après initiation). */
   @Column({ nullable: true })
   transactionId: string;
 
+  /** Référence marchande unique envoyée à KELPAY (corrélation + idempotence). */
+  @Index({ unique: true })
+  @Column({ nullable: true })
+  merchantReference: string;
+
   @Column({ nullable: true })
   phoneNumber: string;
-
-  @ManyToOne(() => WiFiAccount, (wifiAccount) => wifiAccount.payments, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'wifiAccountId' })
-  wifiAccount: WiFiAccount;
 
   @Column({ nullable: true })
   wifiAccountId: string;
@@ -71,6 +75,14 @@ export class Payment {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  /** Dernières réponses brutes (KELPAY init / polls / callback), JSON concaténé ou tableau sérialisé. */
+  @Column({ type: 'text', nullable: true })
+  providerResponse: string;
+
+  /** Fin de traitement callback (idempotence). */
+  @Column({ type: 'timestamp', nullable: true })
+  callbackProcessedAt: Date;
+
   @OneToOne(() => Ticket, (ticket) => ticket.payment, { nullable: true })
   ticket: Ticket;
 
@@ -83,4 +95,3 @@ export class Payment {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

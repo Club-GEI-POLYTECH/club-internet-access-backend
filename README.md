@@ -1,121 +1,67 @@
-# 🌐 Backend API - Club Internet Access UNIKIN
+# Backend — vente de tickets Wi‑Fi (UNIKIN)
 
-API NestJS pour la gestion d'accès Wi-Fi via MikroTik RouterOS.
+API **NestJS** centrée sur l’**import CSV** (Mikhmon) et la **vente** de tickets : catalogue par durée (**24h / 7j / 30j**), paiements, dashboard, authentification admin/agent.
 
-## 🎯 Fonctionnalités
+## Prérequis
 
-- ✅ Gestion complète des comptes Wi-Fi (création, expiration automatique)
-- ✅ **Système de vente de tickets pré-générés depuis Mikhmon** 🎫
-- ✅ Intégration MikroTik RouterOS API
-- ✅ Système de paiement avec génération automatique de comptes
-- ✅ Authentification JWT avec rôles (Admin, Agent, Student)
-- ✅ Dashboard avec statistiques en temps réel
-- ✅ Synchronisation automatique des sessions actives
-- ✅ Expiration automatique des comptes (scheduler)
+- **Node.js** 20 ou plus récent  
+- **PostgreSQL** 15+ accessible localement (ou distant) : créez une base (ex. `internet_access`) et renseignez `DATABASE_URL` dans `.env`.
 
-## 🚀 Démarrage Rapide
+## Démarrage
 
 ```bash
-# Installer les dépendances
 npm install
-
-# Configurer l'environnement
-cp env.example.txt .env
-# Éditer .env avec vos paramètres
-
-# Créer l'utilisateur admin
+cp .env.example .env
+# Éditer .env : DATABASE_URL, JWT_SECRET, TICKET_ENCRYPTION_KEY, ADMIN_SEED_*, SEED_DEV_PASSWORD (dev), KELPAY_* (prod)
 npm run seed:admin
-
-# Démarrer en développement
 npm run start:dev
 ```
 
-L'API sera accessible sur `http://localhost:4000/api`
+Le fichier **`.env`** n’est pas versionné (voir `.gitignore`). Le modèle **`.env.example`** liste toutes les variables (sans secrets réels pour la production).
 
-## 📚 Documentation
+- API : selon `PORT` dans `.env` (souvent `http://localhost:4000/api`)
+- **Documentation des routes** : [docs/API.md](docs/API.md)
+- **Swagger (OpenAPI)** : même origine que l’API, chemin `/api` → bouton *Authorize* pour le JWT (`JWT-auth`)
 
-- [Guide d'installation](./INSTALLATION.md)
-- [Documentation API Swagger](./docs/SWAGGER.md) - Accès et utilisation de la doc Swagger (`/api`)
-- [**Intégration Frontend Next.js**](./INTEGRATION_FRONTEND.md) ⭐ **Guide complet pour intégrer le frontend**
-- [**Contrat API Backend ↔ Frontend**](./docs/API_FRONTEND_CONTRACT.md) ⭐ **Endpoints par page (home, buy-ticket, dashboard, admin/tickets)**
-- [**Configuration CORS**](./CONFIGURATION_CORS.md) ⭐ **Où configurer FRONTEND_URL pour CORS**
-- [**Types TypeScript**](./frontend-types.ts) ⭐ **Types réutilisables pour Next.js**
-- [**Guide de déploiement terrain**](./DEPLOIEMENT_TERRAIN.md) ⭐ **Déploiement réseau réel (Starlink → MikroTik → AP Cisco)**
-- [**Configuration post-installation**](./CONFIGURATION_POST_INSTALLATION.md) ⭐ **Configuration backend après installation réseau**
-- [**Vérification backend**](./VERIFICATION_BACKEND.md) ⭐ **Checklist pour vérifier que tout fonctionne**
-- [Guide Docker Compose](./DOCKER_COMPOSE.md)
-- [Guide de déploiement Railway](./RAILWAY.md)
-- [**Guide configuration multi-services Railway**](./RAILWAY_MULTI_SERVICE_SETUP.md) ⭐ **Important pour détecter backend + postgres**
-- [Guide d'insertion des données](./SEED_GUIDE.md)
-- [Scripts de configuration MikroTik](./scripts/README.md)
-- [**Système de vente de tickets**](./TICKETS.md) ⭐ **Vente de tickets pré-générés depuis Mikhmon**
+## Prix des tickets (durée)
 
-## 🏗️ Architecture
+À l’import CSV, le prix est calculé à partir de la colonne **Time Limit** (ex. `24h`, `7d`, `30d`) et des variables :
 
-```
-backend/
-├── src/
-│   ├── auth/              # Authentification JWT
-│   ├── mikrotik/          # Service MikroTik RouterOS
-│   ├── users/             # Gestion utilisateurs
-│   ├── wifi-accounts/     # Gestion comptes Wi-Fi
-│   ├── payment/           # Gestion paiements
-│   ├── sessions/          # Gestion sessions actives
-│   ├── dashboard/         # Statistiques et dashboard
-│   └── entities/          # Entités TypeORM
-```
+| Variable | Rôle |
+|----------|------|
+| `TICKET_PRICE_24H` | Forfait ~24h / 48h / 1j (tout ce qui n’est pas 7 ou 30 jours) |
+| `TICKET_PRICE_7D` | Limite contenant `7` (ex. `7d`, `7j`) |
+| `TICKET_PRICE_30D` | Limite contenant `30` |
 
-## 🔧 Technologies
+Valeurs par défaut d’exemple dans `.env.example`. Le **prix catalogue** est sur la table **`ticket_types`** (pas sur chaque ticket). Pour le modifier, mettre à jour le type concerné en base ou via vos outils d’administration.
 
-- **NestJS** - Framework Node.js
-- **TypeORM** - ORM pour PostgreSQL
-- **Passport** - Authentification
-- **JWT** - Tokens d'authentification
-- **routeros-client** - Client MikroTik API
-- **@nestjs/schedule** - Tâches planifiées
+## Modules supprimés (non utilisés ici)
 
-## 📝 Variables d'environnement
+Comptes Wi‑Fi, sessions, bande passante, MikroTik : **retirés** du code et des routes. Les tables historiques peuvent rester en base ; l’ORM ne mappe plus que `users`, `payments`, `tickets`, `ticket_types`, `password_reset_tokens`.
 
-Voir `env.example.txt` pour la liste complète des variables.
+## Endpoints utiles
 
-## 🔐 Sécurité
+| Zone | Exemples |
+|------|----------|
+| Public | `GET /tickets/types`, `GET /tickets/available`, `POST /tickets/purchase` |
+| Auth | `POST /auth/login`, `GET /auth/profile` |
+| Admin tickets | `POST /tickets/admin/import`, `POST /tickets/admin/import/recommendations`, `GET /tickets/admin/stats` — voir [docs/API.md](docs/API.md) |
+| Paiements | `GET /payments`, `POST /payments/initiate` (KELPAY, JWT), `POST /payments/:id/complete`, `PUT /payments/:id/status` (admin/agent) — guide frontend : [docs/FRONTEND_PAIEMENTS_KELPAY.md](docs/FRONTEND_PAIEMENTS_KELPAY.md) |
+| Dashboard | `GET /dashboard/stats`, `GET /dashboard/charts?days=7`, `GET /dashboard/my-stats` |
 
-- Authentification JWT obligatoire pour tous les endpoints (sauf auth)
-- Guards basés sur les rôles
-- Validation des données avec class-validator
-- Mots de passe hashés avec bcrypt
+## Déploiement (Railway / Render)
 
-## 📊 Endpoints Principaux
+Le dépôt est prévu pour un build **Node** classique (`npm ci`, `npm run build`, `node dist/main.js`). Voir `railway.json` / `railway.toml` (Nixpacks) et `render.yaml` (runtime Node). La variable `DATABASE_URL` doit pointer vers votre base PostgreSQL.
 
-- `/api/auth/*` - Authentification
-- `/api/tickets/*` - Vente de tickets pré-générés 🎫
-- `/api/wifi-accounts/*` - Gestion comptes Wi-Fi
-- `/api/payments/*` - Gestion paiements
-- `/api/sessions/*` - Sessions actives
-- `/api/dashboard/*` - Statistiques
-- `/api/mikrotik/*` - Contrôle MikroTik
+## Fichiers frontend
 
-## 🧪 Tests
+- `frontend-types.ts` — types alignés sur cette API
+- `frontend-api-client.ts` — client minimal (auth, tickets, paiements, dashboard)
 
-```bash
-# Tests unitaires
-npm run test
+## CSV Mikhmon
 
-# Tests avec couverture
-npm run test:cov
+Colonnes attendues : **Username, Password, Profile, Time Limit, Data Limit, Comment** (comme avant). Le **prix** ne vient plus d’un `defaultPrice` multipart : uniquement des variables `TICKET_PRICE_*` + **Time Limit**.
 
-# Tests e2e
-npm run test:e2e
-```
+## Scripts terrain MikroTik
 
-## 📦 Build Production
-
-```bash
-npm run build
-npm run start:prod
-```
-
-## 🤝 Contribution
-
-Ce projet est développé pour l'Université de Kinshasa (UNIKIN).
-
+Les fichiers sous `scripts/` (`mikrotik-setup.rsc`, etc.) restent des **références** pour le routeur ; cette API ne les appelle pas.

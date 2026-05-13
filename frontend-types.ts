@@ -1,15 +1,9 @@
 /**
- * Types TypeScript pour l'intégration frontend Next.js
- * 
- * Copiez ce fichier dans votre projet Next.js : types/api.ts
- * 
- * Usage:
- * import type { WiFiAccount, Payment, DashboardStats } from '@/types/api';
+ * Types pour intégration frontend (vente de tickets uniquement).
+ * Copiez dans votre projet Next.js : types/api.ts
  */
 
-// ============================================
-// AUTHENTIFICATION
-// ============================================
+// --- Auth ---
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -45,70 +39,104 @@ export interface RegisterRequest {
   firstName: string;
   lastName: string;
   phone?: string;
-  role?: UserRole;
 }
 
-export interface ForgotPasswordRequest {
+/** Étape 2 : même corps que la réponse de `POST /auth/register/verify`. */
+export interface RegisterVerifyRequest {
   email: string;
+  code: string;
 }
 
-export interface ResetPasswordRequest {
-  token: string;
-  newPassword: string;
+export interface RegisterRequestResponse {
+  message: string;
 }
 
-// ============================================
-// WIFI ACCOUNTS
-// ============================================
+// --- Tickets ---
 
-export enum DurationType {
-  HOURS_24 = '24h',
-  HOURS_48 = '48h',
-  DAYS_7 = '7d',
-  DAYS_30 = '30d',
-  UNLIMITED = 'unlimited',
+export enum TicketStatus {
+  AVAILABLE = 'available',
+  RESERVED = 'reserved',
+  SOLD = 'sold',
+  EXPIRED = 'expired',
 }
 
-export enum BandwidthProfile {
-  BASIC_1MB = '1mbps',
-  STANDARD_2MB = '2mbps',
-  PREMIUM_5MB = '5mbps',
-}
-
-export interface WiFiAccount {
+export interface TicketType {
   id: string;
-  username: string;
-  password: string;
-  duration: DurationType;
-  bandwidthProfile: BandwidthProfile;
-  maxDevices: number;
-  expiresAt: string;
+  name: string;
+  profile: string;
+  description?: string;
+  timeLimit?: string;
+  dataLimit?: string;
+  price: number;
   isActive: boolean;
-  isExpired: boolean;
-  mikrotikUserId?: string;
-  comment?: string;
-  createdBy?: User;
-  createdById?: string;
+  availableCount?: number;
   createdAt: string;
   updatedAt?: string;
 }
 
-export interface CreateWiFiAccountRequest {
-  username?: string;
-  duration: DurationType;
-  bandwidthProfile: BandwidthProfile;
-  maxDevices?: number;
+export interface Ticket {
+  id: string;
+  username: string;
+  password?: string;
+  profile: string;
+  timeLimit?: string;
+  dataLimit?: string;
   comment?: string;
+  status: TicketStatus;
+  soldAt?: string;
+  soldTo?: string;
+  ticketTypeId?: string;
+  /** Prix catalogue (CDF) : toujours présent si le ticket est lié à un type. */
+  ticketType?: TicketType;
+  paymentId?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
-// ============================================
-// PAYMENTS
-// ============================================
+export interface PurchaseTicketRequest {
+  ticketId: string;
+  phoneNumber: string;
+  method: 'mobile_money' | 'cash';
+}
+
+export interface PurchaseTicketResponse {
+  ticket: Ticket;
+  payment: Payment;
+  credentials: {
+    username: string;
+    password: string;
+    profile: string;
+    instructions: string;
+  };
+}
+
+export interface ImportTypeRecommendation {
+  typeKey: '24h' | '7j' | '30j';
+  typeLabel: string;
+  count: number;
+  sampleTimeLimit?: string | null;
+  recommendedPrice: number;
+  action: 'use_existing' | 'create_new';
+  matchedTicketType: TicketType | null;
+}
+
+export interface ImportTypeRecommendationsResponse {
+  summary: {
+    totalRows: number;
+    uniqueTypes: number;
+  };
+  recommendations: ImportTypeRecommendation[];
+}
+
+// --- Paiements ---
 
 export enum PaymentStatus {
   PENDING = 'pending',
+  PROCESSING = 'processing',
+  SUCCESS = 'success',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  EXPIRED = 'expired',
   CANCELLED = 'cancelled',
 }
 
@@ -124,23 +152,17 @@ export interface Payment {
   method: PaymentMethod;
   status: PaymentStatus;
   transactionId?: string;
+  merchantReference?: string;
   phoneNumber?: string;
-  wifiAccountId?: string;
-  wifiAccount?: WiFiAccount;
+  ticketId?: string;
+  ticket?: Ticket;
   notes?: string;
+  providerResponse?: string;
+  callbackProcessedAt?: string;
   createdBy?: User;
   createdById?: string;
   createdAt: string;
-  completedAt?: string;
-}
-
-export interface CreatePaymentRequest {
-  amount: number;
-  method: PaymentMethod;
-  transactionId?: string;
-  phoneNumber?: string;
-  wifiAccountId?: string;
-  notes?: string;
+  updatedAt?: string;
 }
 
 export interface CompletePaymentRequest {
@@ -151,45 +173,36 @@ export interface UpdatePaymentStatusRequest {
   status: PaymentStatus;
 }
 
-// ============================================
-// SESSIONS
-// ============================================
-
-export interface Session {
-  id: string;
-  wifiAccountId: string;
-  wifiAccount?: WiFiAccount;
-  mikrotikSessionId?: string;
-  ipAddress?: string;
-  macAddress?: string;
-  bytesIn: number;
-  bytesOut: number;
-  connectedAt?: string;
-  disconnectedAt?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt?: string;
+/** Corps de `POST /payments/initiate` (Mobile Money KELPAY). */
+export interface InitiateKelpayPaymentRequest {
+  ticketId: string;
+  phoneNumber: string;
+  /** CDF — doit être strictement égal à `ticket.ticketType.price`. */
+  amount: number;
+  /** Doit correspondre au JWT si l’utilisateur est `student`. */
+  userId: string;
 }
 
-export interface SessionStatistics {
-  total: number;
-  active: number;
-  ended: number;
-  totalBytesUp: number;
-  totalBytesDown: number;
-  averageUptime: number;
+/** Réponse backend après initiation KELPAY (polling serveur + callback en parallèle). */
+export interface InitiateKelpayPaymentResponse {
+  paymentId: string;
+  merchantReference: string;
+  transactionId?: string;
+  status: PaymentStatus;
+  kelpay: {
+    raw: string;
+    fields: Record<string, string>;
+    transactionId?: string;
+    reference?: string;
+    transactionStatus?: string;
+    kelpayCode?: string;
+    message?: string;
+  };
 }
 
-// ============================================
-// DASHBOARD
-// ============================================
+// --- Dashboard ---
 
 export interface DashboardStats {
-  accounts: {
-    total: number;
-    active: number;
-    expired: number;
-  };
   payments: {
     total: number;
     completed: number;
@@ -197,118 +210,32 @@ export interface DashboardStats {
     failed: number;
     revenue: number;
   };
-  sessions: {
+  tickets: {
     total: number;
-    active: number;
-    mikrotikActive: number;
-    totalBytesTransferred: number;
+    available: number;
+    sold: number;
+    reserved: number;
+    revenue: number;
   };
   users: {
     total: number;
     active: number;
   };
-}
-
-export interface ChartData {
-  accounts: Array<{
-    date: string;
-    created: number;
-    expired: number;
-  }>;
-  payments: Array<{
-    date: string;
-    count: number;
-    revenue: number;
-  }>;
-  sessions: Array<{
-    date: string;
-    active: number;
-    new: number;
-  }>;
-}
-
-// ============================================
-// MIKROTIK
-// ============================================
-
-export interface MikroTikStatus {
-  connected: boolean;
-}
-
-export interface MikroTikHotspotUser {
-  '.id'?: string;
-  name: string;
-  password?: string;
-  profile: string;
-  'limit-uptime'?: string;
-  'shared-users'?: number;
-  disabled?: string;
-  comment?: string;
-}
-
-export interface MikroTikActiveUser {
-  '.id': string;
-  user: string;
-  address: string;
-  uptime: string;
-  'bytes-in': number;
-  'bytes-out': number;
-  'packets-in'?: number;
-  'packets-out'?: number;
-}
-
-export interface CreateMikroTikUserRequest {
-  name: string;
-  password: string;
-  profile?: string;
-  'limit-uptime'?: string;
-  'shared-users'?: number;
-  comment?: string;
-  disabled?: boolean;
-}
-
-// ============================================
-// BANDWIDTH
-// ============================================
-
-export interface BandwidthRealtime {
-  totalBytesUp: number;
-  totalBytesDown: number;
-  activeConnections: number;
-  lastUpdated: string;
-}
-
-export interface BandwidthStats {
-  totalBytesUp: number;
-  totalBytesDown: number;
-  totalBytes: number;
-  averageBytesPerSession: number;
-  peakBytesPerSecond: number;
-}
-
-export interface UserBandwidth {
-  username: string;
-  totalBytesUp: number;
-  totalBytesDown: number;
-  totalBytes: number;
-  activeSession?: {
-    id: string;
-    bytesUp: number;
-    bytesDown: number;
-    uptime: number;
+  recent: {
+    payments: Payment[];
   };
 }
 
-export interface BandwidthHistory {
-  date: string;
-  totalBytesUp: number;
-  totalBytesDown: number;
-  activeConnections: number;
+export interface MyStats {
+  paymentsCount: number;
 }
 
-// ============================================
-// API RESPONSES
-// ============================================
+export interface ChartData {
+  payments: Array<{ date: string; count: string; revenue: string }>;
+  ticketsSold: Array<{ date: string; sold: string }>;
+}
+
+// --- Erreurs ---
 
 export interface ApiError {
   statusCode: number;
@@ -316,54 +243,17 @@ export interface ApiError {
   error: string;
 }
 
-export interface ApiResponse<T> {
-  data?: T;
-  error?: ApiError;
-}
-
-// ============================================
-// PAGINATION (si implémenté)
-// ============================================
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-// ============================================
-// UTILITAIRES
-// ============================================
-
-export type DurationLabel = '24 heures' | '48 heures' | '7 jours' | '30 jours' | 'Illimité';
-export type BandwidthLabel = '1 Mbps' | '2 Mbps' | '5 Mbps';
-export type PaymentStatusLabel = 'En attente' | 'Complété' | 'Échoué' | 'Annulé';
-export type PaymentMethodLabel = 'Mobile Money' | 'Espèces' | 'Carte';
-
-export const durationLabels: Record<DurationType, DurationLabel> = {
-  [DurationType.HOURS_24]: '24 heures',
-  [DurationType.HOURS_48]: '48 heures',
-  [DurationType.DAYS_7]: '7 jours',
-  [DurationType.DAYS_30]: '30 jours',
-  [DurationType.UNLIMITED]: 'Illimité',
-};
-
-export const bandwidthLabels: Record<BandwidthProfile, BandwidthLabel> = {
-  [BandwidthProfile.BASIC_1MB]: '1 Mbps',
-  [BandwidthProfile.STANDARD_2MB]: '2 Mbps',
-  [BandwidthProfile.PREMIUM_5MB]: '5 Mbps',
-};
-
-export const paymentStatusLabels: Record<PaymentStatus, PaymentStatusLabel> = {
+export const paymentStatusLabels: Record<PaymentStatus, string> = {
   [PaymentStatus.PENDING]: 'En attente',
+  [PaymentStatus.PROCESSING]: 'En cours (Mobile Money)',
+  [PaymentStatus.SUCCESS]: 'Payé (KELPAY)',
   [PaymentStatus.COMPLETED]: 'Complété',
   [PaymentStatus.FAILED]: 'Échoué',
+  [PaymentStatus.EXPIRED]: 'Expiré',
   [PaymentStatus.CANCELLED]: 'Annulé',
 };
 
-export const paymentMethodLabels: Record<PaymentMethod, PaymentMethodLabel> = {
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
   [PaymentMethod.MOBILE_MONEY]: 'Mobile Money',
   [PaymentMethod.CASH]: 'Espèces',
   [PaymentMethod.CARD]: 'Carte',
