@@ -8,8 +8,9 @@ API **NestJS** : import CSV (Mikhmon), catalogue par durée (**24h / 7j / 30j**)
 2. [Configuration](#configuration)
 3. [Logique métier : import → vente → dashboard](#logique-métier--import--vente--dashboard)
 4. [Référence des routes](#référence-des-routes)
-5. [Paiements KELPAY (intégration frontend)](#paiements-kelpay-intégration-frontend)
-6. [Swagger, client TypeScript, déploiement](#swagger-client-typescript-déploiement)
+5. [Inscription (flux frontend)](#inscription-flux-frontend) — détail vues / formulaires : **[FRONTEND_AUTH_FLUX.md](./FRONTEND_AUTH_FLUX.md)**
+6. [Paiements KELPAY (intégration frontend)](#paiements-kelpay-intégration-frontend)
+7. [Swagger, client TypeScript, déploiement](#swagger-client-typescript-déploiement)
 
 Toutes les routes HTTP sont sous le préfixe **`/api`** (ex. `http://localhost:4000/api/...` selon `PORT`).
 
@@ -104,6 +105,34 @@ Enchaînement typique : ticket **`available`** → **`reserved`** → paiement c
 | POST | `/api/auth/reset-password` | Non | Reset mot de passe |
 
 En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` / `student` selon routes.
+
+### Inscription (flux frontend)
+
+Évite le **404 « ressource non trouvée »** côté client : c’est en général une **mauvaise URL** (sans `/api`, ou URL du front au lieu du backend), pas l’échec de l’email.
+
+**Guide complet (vues, formulaires, inscription + mot de passe oublié)** : **[FRONTEND_AUTH_FLUX.md](./FRONTEND_AUTH_FLUX.md)**.
+
+1. **URL de base** : toutes les routes sont sous **`/api`**. Exemple : `https://ton-backend.com/api` ou `http://localhost:4000/api`.  
+   - Si ton front utilise `NEXT_PUBLIC_API_URL`, mets soit **`http://localhost:4000`**, soit **`http://localhost:4000/api`** — le fichier **`frontend-api-client.ts`** ajoute automatiquement `/api` s’il manque.  
+   - Si la variable pointe vers le **site Next** (`https://wifi...`) au lieu du **serveur Nest**, tu obtiens un **404** : l’URL doit être celle où tourne l’API (Railway, Render, etc.).
+
+2. **Étape 1 — demande + envoi email**  
+   - `POST /api/auth/register/request`  
+   - `Content-Type: application/json`  
+   - Corps : `{ "email", "password" (≥6), "firstName", "lastName", "phone?" }`  
+   - Réponse **200** : `{ "message": "Si cette adresse est valide…" }` (toujours un message générique côté sécurité).  
+   - **400** : validation ou **échec Resend** (clé / `RESEND_FROM_EMAIL` / domaine). Ce n’est **pas** un 404.
+
+3. **Étape 2 — code reçu par email**  
+   - `POST /api/auth/register/verify`  
+   - Corps : `{ "email", "code" }` (code à 6 chiffres).  
+   - Réponse **200** : même forme que le login (`access_token`, `user`).
+
+4. **Renvoi du code** (optionnel)  
+   - `POST /api/auth/register/resend`  
+   - Corps : `{ "email" }`.
+
+5. **CORS** : l’origine du front doit être autorisée (`FRONTEND_URL` côté backend, voir `main.ts`). Sinon le navigateur bloque la requête (souvent erreur réseau / CORS, pas toujours un JSON 404).
 
 ### App
 

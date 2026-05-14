@@ -1,6 +1,9 @@
 /**
  * Client API (vente de tickets) pour Next.js — copier vers lib/api-client.ts
  *
+ * `NEXT_PUBLIC_API_URL` : origine du **backend** Nest (ex. `http://localhost:4000` ou `https://api.xxx.com`).
+ * Le préfixe `/api` est ajouté automatiquement s’il manque (évite les 404 sur `/auth/register/...`).
+ *
  * Usage: import { apiClient } from '@/lib/api-client';
  */
 
@@ -32,7 +35,20 @@ import type {
   ApiError,
 } from './frontend-types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+/**
+ * Base de l’API Nest (préfixe global `/api`).
+ * `NEXT_PUBLIC_API_URL` peut être `http://localhost:4000` ou `http://localhost:4000/api` — on normalise.
+ */
+function normalizeApiBaseUrl(raw: string | undefined): string {
+  const fallback = 'http://localhost:4000';
+  const trimmed = (raw || fallback).trim().replace(/\/+$/, '');
+  if (trimmed.endsWith('/api')) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+}
+
+const API_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 
 const getToken = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -73,7 +89,10 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     throw new Error('Session expirée. Veuillez vous reconnecter.');
   }
   if (response.status === 403) throw new Error('Accès refusé.');
-  if (response.status === 404) throw new Error('Ressource non trouvée.');
+  if (response.status === 404)
+    throw new Error(
+      `Ressource non trouvée (${response.url}). Vérifiez NEXT_PUBLIC_API_URL (ex. http://localhost:4000 ou …/api) et le chemin (inscription : POST /auth/register/request).`,
+    );
   if (!response.ok) {
     const error: ApiError = await response.json().catch(() => ({
       statusCode: response.status,

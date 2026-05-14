@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // CORS: site production + local + FRONTEND_URL (Railway peut n'avoir qu'une URL)
   const productionOrigin = 'https://wifi.clubgei-polytech.org';
-  const defaultOrigins = [productionOrigin, 'http://localhost:3000'];
+  const defaultOrigins = [productionOrigin, 'http://localhost:3000', 'http://localhost:3001'];
   const fromEnv = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map(url => url.trim()).filter(Boolean)
     : [];
@@ -25,6 +25,9 @@ async function bootstrap() {
     ...new Set([...defaultOrigins, ...fromEnv.map(url => url.replace(/\/$/, ''))]),
   ];
   const allowedOrigins = rawOrigins.map(url => url.replace(/\/$/, ''));
+  const nodeEnv = configService.get<string>('NODE_ENV') || 'development';
+  const isDevLocalOrigin = (o: string) =>
+    nodeEnv !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o);
   
   logger.log('🌐 CORS Configuration:');
   logger.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
@@ -40,9 +43,9 @@ async function bootstrap() {
         allowedOrigins.includes(originNormalized) ||
         allowedOrigins.some(allowed => originNormalized === allowed || originNormalized.startsWith(allowed + '/'));
       const isRailwayOrigin =
-        configService.get('NODE_ENV') === 'production' &&
+        nodeEnv === 'production' &&
         (originNormalized.includes('.railway.app') || originNormalized.includes('.up.railway.app'));
-      const isAllowed = isInList || isRailwayOrigin;
+      const isAllowed = isInList || isRailwayOrigin || isDevLocalOrigin(originNormalized);
 
       if (isAllowed) {
         callback(null, true);
@@ -115,8 +118,7 @@ async function bootstrap() {
   });
 
   const port = configService.get<number>('PORT') || 3000;
-  const nodeEnv = configService.get<string>('NODE_ENV') || 'development';
-  
+
   await app.listen(port);
   
   if (nodeEnv === 'production') {
