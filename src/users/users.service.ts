@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -13,18 +15,20 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-  async create(userData: Partial<User>): Promise<User> {
-    this.logger.log(`create user email=${userData.email} role=${userData.role}`);
-    // Hasher le mot de passe si fourni (comme dans register)
-    if (userData.password) {
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
-      userData = {
-        ...userData,
-        password: hashedPassword,
-      };
-    }
-    
-    const user = this.usersRepository.create(userData);
+  async create(dto: CreateUserDto): Promise<User> {
+    const email = dto.email.trim().toLowerCase();
+    const role = dto.role ?? UserRole.AGENT;
+    this.logger.log(`create user email=${email} role=${role}`);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const user = this.usersRepository.create({
+      email,
+      password: hashedPassword,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phone: dto.phone,
+      role,
+      isActive: true,
+    });
     const saved = await this.usersRepository.save(user);
     this.logger.log(`user created id=${saved.id}`);
     return saved;
@@ -34,10 +38,11 @@ export class UsersService {
     this.logger.log('findAll users');
     return await this.usersRepository.find({
       relations: ['payments'],
+      order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: string): Promise<User> {
+  async findOne(id: string): Promise<User | null> {
     this.logger.log(`findOne user id=${id}`);
     return await this.usersRepository.findOne({
       where: { id },
@@ -51,18 +56,34 @@ export class UsersService {
     });
   }
 
-  async update(id: string, userData: Partial<User>): Promise<User> {
+  async update(id: string, dto: UpdateUserDto): Promise<User> {
     this.logger.log(`update user id=${id}`);
-    // Hasher le mot de passe si fourni dans la mise à jour
-    if (userData.password) {
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
-      userData = {
-        ...userData,
-        password: hashedPassword,
-      };
+    const patch: Partial<User> = {};
+    if (dto.email !== undefined) {
+      patch.email = dto.email.trim().toLowerCase();
     }
-    
-    await this.usersRepository.update(id, userData);
+    if (dto.firstName !== undefined) {
+      patch.firstName = dto.firstName;
+    }
+    if (dto.lastName !== undefined) {
+      patch.lastName = dto.lastName;
+    }
+    if (dto.phone !== undefined) {
+      patch.phone = dto.phone;
+    }
+    if (dto.role !== undefined) {
+      patch.role = dto.role;
+    }
+    if (dto.isActive !== undefined) {
+      patch.isActive = dto.isActive;
+    }
+    if (dto.password !== undefined) {
+      patch.password = await bcrypt.hash(dto.password, 10);
+    }
+    if (Object.keys(patch).length === 0) {
+      return await this.findOne(id);
+    }
+    await this.usersRepository.update(id, patch);
     return await this.findOne(id);
   }
 

@@ -45,6 +45,7 @@ Modèles à la racine : **`.env.local.example`** (développement), **`.env.produ
 | Emails | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (recommandé) ou `RESEND_FROM` (alias), `REGISTRATION_*` |
 | Seed | `ADMIN_SEED_*` (optionnel ; sinon admin par défaut `president@clubgei-polytech.org` au `npm run seed:admin`) |
 | KELPAY | `KELPAY_MERCHANT_CODE`, `KELPAY_TOKEN`, `KELPAY_CALLBACK_URL` ou `PUBLIC_API_URL` / `RAILWAY_PUBLIC_DOMAIN`, etc. |
+| Webhooks | `TICKETS_PAYMENT_WEBHOOK_SECRET` (obligatoire pour `POST /tickets/webhook/payment`) ; optionnel `KELPAY_CALLBACK_ALLOWED_IPS` (liste d’IPs autorisées pour `POST /payments/callback`, virgules) |
 
 Les endpoints Keccel sont définis dans le code (`src/kelpay/kelpay.constants.ts`), pas dans `.env`.
 
@@ -145,11 +146,11 @@ En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` 
 
 | Méthode | Chemin | Auth |
 |---------|--------|------|
-| GET | `/api/users` | JWT |
-| GET | `/api/users/:id` | JWT |
-| POST | `/api/users` | JWT |
-| PUT | `/api/users/:id` | JWT |
-| DELETE | `/api/users/:id` | JWT |
+| GET | `/api/users` | JWT **admin** |
+| GET | `/api/users/:id` | JWT **admin** |
+| POST | `/api/users` | JWT **admin** |
+| PUT | `/api/users/:id` | JWT **admin** |
+| DELETE | `/api/users/:id` | JWT **admin** |
 
 ### Tickets (public & authentifié)
 
@@ -165,7 +166,7 @@ En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` 
 | GET | `/api/tickets/me` | JWT | Tickets achetés |
 | POST | `/api/tickets/:id/reserve` | Non | Réserver |
 | POST | `/api/tickets/:id/release` | Non | Libérer |
-| POST | `/api/tickets/webhook/payment` | Non | Webhook paiement (intégration) |
+| POST | `/api/tickets/webhook/payment` | En-tête `X-Payment-Webhook-Secret` (= `TICKETS_PAYMENT_WEBHOOK_SECRET`) | Webhook interne (mise à jour statut paiement / ticket) |
 
 ### Tickets (admin)
 
@@ -199,6 +200,10 @@ Alias sous **`/api/admin/tickets`** : `POST .../import`, `GET .../stats`, `DELET
 | POST | `/api/payments/callback` | Non | Webhook Kelpay — réponse texte `OK` |
 
 Configurer une URL **HTTPS** publique vers le callback (`KELPAY_CALLBACK_URL` recommandé, ou `PUBLIC_API_URL` / `RAILWAY_PUBLIC_DOMAIN` + chemin). Après `initiate`, `code: 0` Kelpay = demande reçue ; le statut final vient de **verify** / **confirm** ou du **callback**.
+
+**Durcissement optionnel** : si `KELPAY_CALLBACK_ALLOWED_IPS` est défini (IPs séparées par des virgules), les requêtes callback depuis une autre adresse sont ignorées (réponse toujours `OK` pour Keccel). En production derrière un proxy, `trust proxy` est activé pour que `req.ip` reflète le client réel.
+
+**Note sécurité** : la passerelle ne fournit pas de signature HMAC standard dans la doc intégrée ici ; la corrélation repose sur `merchantReference` / `transactionId`. Surveiller les logs en cas d’abus.
 
 ### Dashboard
 

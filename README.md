@@ -23,7 +23,7 @@ Le fichier **`.env`** n’est pas versionné (voir `.gitignore`). Modèles : **`
 - API : selon `PORT` dans `.env` (souvent `http://localhost:4000/api`)
 - **Documentation unifiée** : [docs/README.md](docs/README.md) (démarrage, métier, routes, KELPAY, déploiement)
 - **Frontend — inscription & mot de passe oublié** : [docs/FRONTEND_AUTH_FLUX.md](docs/FRONTEND_AUTH_FLUX.md)
-- **Swagger (OpenAPI)** : même origine que l’API, chemin `/api` → bouton *Authorize* pour le JWT (`JWT-auth`)
+- **Swagger (OpenAPI)** : en développement uniquement (`NODE_ENV` ≠ `production`), chemin `/api` — bouton *Authorize* pour le JWT (`JWT-auth`). En production, Swagger est désactivé ; voir [docs/README.md](docs/README.md).
 
 ## Prix des tickets (durée)
 

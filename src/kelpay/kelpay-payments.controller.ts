@@ -1,4 +1,6 @@
 import { Body, Controller, HttpCode, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -12,24 +14,32 @@ import { InitiateKelpayPaymentDto } from './dto/initiate-kelpay-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserRole } from '../entities/user.entity';
 import { KELPAY_CHECK_TRANSACTION_URL } from './kelpay.constants';
+import {
+  isKelpayCallbackClientIpAllowed,
+  parseKelpayCallbackAllowedIps,
+} from './kelpay-callback-ip.util';
 
 @ApiTags('Kelpay')
 @Controller('payments')
 export class KelpayPaymentsController {
   private readonly logger = new Logger(KelpayPaymentsController.name);
 
-  constructor(private readonly kelpayOrchestrator: KelpayPaymentOrchestratorService) {}
+  constructor(
+    private readonly kelpayOrchestrator: KelpayPaymentOrchestratorService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Public — pas de JWT. KELPAY envoie souvent `application/x-www-form-urlencoded` ou JSON.
    * Réponse obligatoire : corps texte `OK` (voir doc Keccel).
    */
   @Post('callback')
+  @SkipThrottle()
   @HttpCode(200)
   @ApiOperation({
     summary: 'Callback KELPAY (notification de paiement)',
     description:
-      'Endpoint appelé par Kelpay après paiement (succès ou échec). Pas d’authentification Bearer. Le corps peut être du JSON ou du formulaire (champs typiques : reference, transactionid, transactionstatus, amount). Réponse : texte brut `OK`.',
+      'Endpoint appelé par Kelpay après paiement (succès ou échec). Pas d’authentification Bearer. Le corps peut être du JSON ou du formulaire (champs typiques : reference, transactionid, transactionstatus, amount). Réponse : texte brut `OK`. Si `KELPAY_CALLBACK_ALLOWED_IPS` est défini, les callbacks depuis une autre IP sont ignorés (réponse toujours `OK`).',
   })
   @ApiResponse({ status: 200, description: 'Corps : OK (text/plain)' })
   async kelpayCallback(
@@ -40,6 +50,16 @@ export class KelpayPaymentsController {
     this.logger.log(
       `[KELPAY → backend] callback HTTP entrant content-type=${String(req.headers['content-type'])} content-length=${String(req.headers['content-length'] ?? 'n/a')} ip=${req.ip ?? 'n/a'}`,
     );
+    const allowedIps = parseKelpayCallbackAllowedIps(
+      this.configService.get<string>('KELPAY_CALLBACK_ALLOWED_IPS'),
+    );
+    if (!isKelpayCallbackClientIpAllowed(req.ip, allowedIps)) {
+      this.logger.warn(
+        `KELPAY callback ignoré (IP non autorisée). ip=${req.ip ?? 'n/a'} allowed=${allowedIps.join(',')}`,
+      );
+      res.type('text/plain; charset=utf-8').send('OK');
+      return;
+    }
     try {
       await this.kelpayOrchestrator.handleKelpayCallback(body);
     } catch (err: unknown) {

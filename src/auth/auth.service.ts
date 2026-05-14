@@ -355,7 +355,11 @@ export class AuthService {
 
   async getUserProfile(userId: string) {
     this.logger.log(`getUserProfile userId=${userId}`);
-    return await this.usersService.findOne(userId);
+    const user = await this.usersService.findOne(userId);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return user;
   }
 }
 

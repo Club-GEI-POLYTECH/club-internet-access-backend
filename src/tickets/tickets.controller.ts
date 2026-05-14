@@ -24,6 +24,7 @@ import {
   ApiConsumes,
   ApiBody,
   ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { TicketsService } from './tickets.service';
 import { TicketTypesService } from './ticket-types.service';
@@ -34,6 +35,7 @@ import { TicketsWebhookService } from './tickets-webhook.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { TicketsPaymentWebhookGuard } from './guards/tickets-payment-webhook.guard';
 import { UserRole } from '../entities/user.entity';
 import { TicketStatus } from '../entities/ticket.entity';
 import { CsvImportTypeRecommendationsResult } from './tickets.service';
@@ -332,10 +334,22 @@ export class TicketsController {
   }
 
   @Post('webhook/payment')
-  @ApiOperation({ summary: 'Webhook pour les mises à jour de paiement' })
+  @UseGuards(TicketsPaymentWebhookGuard)
+  @ApiHeader({
+    name: 'X-Payment-Webhook-Secret',
+    description: 'Doit correspondre à la variable d’environnement `TICKETS_PAYMENT_WEBHOOK_SECRET`.',
+    required: true,
+  })
+  @ApiOperation({
+    summary: 'Webhook pour les mises à jour de paiement',
+    description:
+      'Réservé aux intégrations internes : en-tête `X-Payment-Webhook-Secret` requis (voir `TICKETS_PAYMENT_WEBHOOK_SECRET`).',
+  })
   @ApiBody({ type: PaymentWebhookDto })
   @ApiResponse({ status: 200, description: 'Webhook traité avec succès' })
   @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Secret manquant ou invalide' })
+  @ApiResponse({ status: 503, description: 'Secret non configuré côté serveur' })
   async handlePaymentWebhook(@Body() webhookDto: PaymentWebhookDto) {
     this.logger.log(`POST /tickets/webhook/payment paymentId=${webhookDto.paymentId} status=${webhookDto.status}`);
     await this.ticketsWebhookService.handlePaymentWebhook(

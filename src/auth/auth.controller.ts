@@ -1,4 +1,5 @@
 import { Controller, Post, Body, UseGuards, Request, Get, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -18,6 +19,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register/request')
+  @Throttle({ default: { limit: 8, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Demander une inscription (étape 1)',
@@ -34,6 +36,7 @@ export class AuthController {
   }
 
   @Post('register/verify')
+  @Throttle({ default: { limit: 40, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Vérifier le code et finaliser l’inscription (étape 2)',
@@ -49,6 +52,7 @@ export class AuthController {
   }
 
   @Post('register/resend')
+  @Throttle({ default: { limit: 6, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Renvoyer le code d’inscription',
@@ -64,6 +68,7 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @Throttle({ default: { limit: 25, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Se connecter', description: 'Authentification et obtention d\'un token JWT' })
   @ApiBody({ type: LoginDto })
@@ -94,6 +99,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @SkipThrottle()
   @Get('profile')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Obtenir le profil', description: 'Récupère le profil de l\'utilisateur connecté' })
@@ -116,6 +122,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 8, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Demander une réinitialisation', description: 'Demande une réinitialisation de mot de passe par email' })
   @ApiBody({ type: ForgotPasswordDto })
@@ -141,6 +148,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 20, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Réinitialiser le mot de passe', description: 'Réinitialise le mot de passe avec un token' })
   @ApiBody({ type: ResetPasswordDto })

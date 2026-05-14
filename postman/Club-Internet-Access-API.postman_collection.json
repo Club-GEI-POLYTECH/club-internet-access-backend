@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Club Internet Access API",
-    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.\n\n**Dashboard** : `GET /api/dashboard/stats` (admin/agent) renvoie notamment `users.byRole`, `users.inactive`, `recent.users`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
+    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`, `paymentWebhookSecret` (= `TICKETS_PAYMENT_WEBHOOK_SECRET` pour la requête **Webhook Payment**).\n\n**Dashboard** : `GET /api/dashboard/stats` (admin/agent) renvoie notamment `users.byRole`, `users.inactive`, `recent.users`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -15,7 +15,8 @@
     { "key": "merchantReference", "value": "" },
     { "key": "keccelMerchantCode", "value": "" },
     { "key": "keccelToken", "value": "" },
-    { "key": "kelpayTransactionId", "value": "" }
+    { "key": "kelpayTransactionId", "value": "" },
+    { "key": "paymentWebhookSecret", "value": "" }
   ],
   "item": [
     {
@@ -343,7 +344,10 @@
           "name": "Webhook Payment",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Payment-Webhook-Secret", "value": "{{paymentWebhookSecret}}" }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"paymentId\": \"{{paymentId}}\",\n  \"status\": \"completed\",\n  \"transactionId\": \"{{transactionId}}\"\n}"

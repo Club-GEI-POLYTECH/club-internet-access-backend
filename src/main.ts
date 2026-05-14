@@ -1,14 +1,29 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { Logger } from '@nestjs/common';
+import { ClassSerializerInterceptor, Logger, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   const configService = app.get(ConfigService);
+  const nodeEnv = (configService.get<string>('NODE_ENV') || 'development').trim();
+
+  if (nodeEnv === 'production') {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   // JSON + form-urlencoded (callbacks KELPAY souvent en application/x-www-form-urlencoded)
   app.use(json({ limit: '2mb' }));
@@ -25,7 +40,6 @@ async function bootstrap() {
     ...new Set([...defaultOrigins, ...fromEnv.map(url => url.replace(/\/$/, ''))]),
   ];
   const allowedOrigins = rawOrigins.map(url => url.replace(/\/$/, ''));
-  const nodeEnv = configService.get<string>('NODE_ENV') || 'development';
   const isDevLocalOrigin = (o: string) =>
     nodeEnv !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o);
   
@@ -56,7 +70,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Payment-Webhook-Secret'],
   });
 
   // Global validation pipe
@@ -71,86 +85,80 @@ async function bootstrap() {
   // API prefix
   app.setGlobalPrefix('api');
 
-  // Swagger Configuration
-  const config = new DocumentBuilder()
-    .setTitle('Club Internet Access API')
-    .setDescription(
-      [
-        'API vente de tickets Wi‑Fi (import CSV Mikhmon) — UNIKIN.',
-        '',
-        '**Prix** : stockés sur `ticket_types` (durées 24h / 7j / 30j), pas sur chaque ligne `tickets`.',
-        'Pour KELPAY, `amount` = `ticket.ticketType.price`.',
-        '',
-        'Documentation Markdown : voir `docs/README.md` dans le dépôt.',
-      ].join('\n'),
-    )
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Entrez le token JWT',
-        in: 'header',
+  const enableSwagger = nodeEnv !== 'production';
+  if (enableSwagger) {
+    const config = new DocumentBuilder()
+      .setTitle('Club Internet Access API')
+      .setDescription(
+        [
+          'API vente de tickets Wi‑Fi (import CSV Mikhmon) — UNIKIN.',
+          '',
+          '**Prix** : stockés sur `ticket_types` (durées 24h / 7j / 30j), pas sur chaque ligne `tickets`.',
+          'Pour KELPAY, `amount` = `ticket.ticketType.price`.',
+          '',
+          'Documentation Markdown : voir `docs/README.md` dans le dépôt.',
+        ].join('\n'),
+      )
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Entrez le token JWT',
+          in: 'header',
+        },
+        'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+      )
+      .addTag('Auth', 'Endpoints d\'authentification')
+      .addTag('Payments', 'Paiements liés aux ventes de tickets')
+      .addTag('Kelpay', 'Mobile Money KELPAY — POST /payments/initiate, POST /payments/callback (webhook)')
+      .addTag('Dashboard', 'Statistiques vente de tickets')
+      .addTag('Users', 'Gestion des utilisateurs système')
+      .addTag('App', 'Endpoints publics')
+      .addTag('Tickets', 'Vente et consultation des tickets (public + authentifié)')
+      .addTag('Tickets (Admin)', 'Import CSV et gestion des tickets (admin)')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+        docExpansion: 'list',
       },
-      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
-    )
-    .addTag('Auth', 'Endpoints d\'authentification')
-    .addTag('Payments', 'Paiements liés aux ventes de tickets')
-    .addTag('Kelpay', 'Mobile Money KELPAY — POST /payments/initiate, POST /payments/callback (webhook)')
-    .addTag('Dashboard', 'Statistiques vente de tickets')
-    .addTag('Users', 'Gestion des utilisateurs système')
-    .addTag('App', 'Endpoints publics')
-    .addTag('Tickets', 'Vente et consultation des tickets (public + authentifié)')
-    .addTag('Tickets (Admin)', 'Import CSV et gestion des tickets (admin)')
-    .build();
-  
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-      docExpansion: 'list',
-    },
-    customSiteTitle: 'Club Internet Access API',
-  });
+      customSiteTitle: 'Club Internet Access API',
+    });
+  }
 
   const port = configService.get<number>('PORT') || 3000;
 
   await app.listen(port);
-  
+
   if (nodeEnv === 'production') {
-    // Logs production (minimaux et sécurisés)
     const railwayPublicDomain = configService.get<string>('RAILWAY_PUBLIC_DOMAIN');
-    const baseUrl = railwayPublicDomain 
-      ? `https://${railwayPublicDomain}`
-      : `http://localhost:${port}`;
-    
+    const baseUrl = railwayPublicDomain ? `https://${railwayPublicDomain}` : `http://localhost:${port}`;
+
     logger.log(`🚀 Application started on port ${port}`);
     if (railwayPublicDomain) {
       logger.log(`🌐 Public URL: ${baseUrl}`);
-      logger.log(`📚 Swagger API Documentation: ${baseUrl}/api`);
-    } else {
-      logger.log(`📚 Swagger API Documentation: /api`);
     }
+    logger.log('📚 Swagger désactivé en production (NODE_ENV=production)');
     logger.log(`🌍 Environment: ${nodeEnv}`);
     logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
-    
-    // Afficher les infos DB de manière sécurisée
+
     const databaseUrl = configService.get<string>('DATABASE_URL');
     if (databaseUrl) {
       logger.log('📊 Database: Connected via DATABASE_URL');
     }
   } else {
-    // Logs développement (détaillés)
     logger.log(`🚀 Application is running on: http://localhost:${port}`);
     logger.log(`📚 Swagger API Documentation: http://localhost:${port}/api`);
     logger.log(`🌍 Environment: ${nodeEnv}`);
     logger.log(`🌐 CORS Allowed Origins: ${allowedOrigins.join(', ')}`);
-    
-    // Afficher les infos DB en développement
+
     const databaseUrl = configService.get<string>('DATABASE_URL');
     if (databaseUrl) {
       try {
