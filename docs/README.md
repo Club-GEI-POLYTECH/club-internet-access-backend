@@ -9,8 +9,9 @@ API **NestJS** : import CSV (Mikhmon), catalogue par durée (**24h / 7j / 30j**)
 3. [Logique métier : import → vente → dashboard](#logique-métier--import--vente--dashboard)
 4. [Référence des routes](#référence-des-routes)
 5. [Inscription (flux frontend)](#inscription-flux-frontend) — détail vues / formulaires : **[FRONTEND_AUTH_FLUX.md](./FRONTEND_AUTH_FLUX.md)**
-6. [Paiements KELPAY (intégration frontend)](#paiements-kelpay-intégration-frontend)
-7. [Swagger, client TypeScript, déploiement](#swagger-client-typescript-déploiement)
+6. **Sécurité (changements API / front)** : **[FRONTEND_SECURITY_SYNC.md](./FRONTEND_SECURITY_SYNC.md)** — rôles `/users`, webhook, throttling, Swagger prod
+7. [Paiements KELPAY (intégration frontend)](#paiements-kelpay-intégration-frontend)
+8. [Swagger, client TypeScript, déploiement](#swagger-client-typescript-déploiement)
 
 Toutes les routes HTTP sont sous le préfixe **`/api`** (ex. `http://localhost:4000/api/...` selon `PORT`).
 
