@@ -573,7 +573,7 @@ export class TicketsService implements OnModuleInit {
     const key = (process.env.TICKET_ENCRYPTION_KEY ?? '').trim();
     if (!key) {
       throw new Error(
-        'TICKET_ENCRYPTION_KEY doit être défini dans le fichier .env (chiffrement des mots de passe des tickets).',
+        'TICKET_ENCRYPTION_KEY doit être défini dans le fichier .env (voir .env.local.example).',
       );
     }
     return key;

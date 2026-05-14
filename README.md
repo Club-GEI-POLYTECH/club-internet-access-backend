@@ -11,16 +11,17 @@ API **NestJS** centrée sur l’**import CSV** (Mikhmon) et la **vente** de tick
 
 ```bash
 npm install
-cp .env.example .env
-# Éditer .env : DATABASE_URL, JWT_SECRET, TICKET_ENCRYPTION_KEY, ADMIN_SEED_*, SEED_DEV_PASSWORD (dev), KELPAY_* (prod)
+cp .env.local.example .env
 npm run seed:admin
 npm run start:dev
 ```
 
-Le fichier **`.env`** n’est pas versionné (voir `.gitignore`). Le modèle **`.env.example`** liste toutes les variables (sans secrets réels pour la production).
+En production, partir de **`.env.production.example`** (mêmes clés), renseigner secrets et URLs, puis déployer avec ce contenu dans les variables d’environnement de la plateforme ou dans un fichier **`.env`** non versionné.
+
+Le fichier **`.env`** n’est pas versionné (voir `.gitignore`). Modèles : **`.env.local.example`** (développement), **`.env.production.example`** (production).
 
 - API : selon `PORT` dans `.env` (souvent `http://localhost:4000/api`)
-- **Documentation des routes** : [docs/API.md](docs/API.md)
+- **Documentation unifiée** : [docs/README.md](docs/README.md) (démarrage, métier, routes, KELPAY, déploiement)
 - **Swagger (OpenAPI)** : même origine que l’API, chemin `/api` → bouton *Authorize* pour le JWT (`JWT-auth`)
 
 ## Prix des tickets (durée)
@@ -33,7 +34,7 @@ Le fichier **`.env`** n’est pas versionné (voir `.gitignore`). Le modèle **`
 | `TICKET_PRICE_7D` | Limite contenant `7` (ex. `7d`, `7j`) |
 | `TICKET_PRICE_30D` | Limite contenant `30` |
 
-Valeurs par défaut d’exemple dans `.env.example`. Le **prix catalogue** est sur la table **`ticket_types`** (pas sur chaque ticket). Pour le modifier, mettre à jour le type concerné en base ou via vos outils d’administration.
+Les variables **`TICKET_PRICE_*`** du fichier d’environnement servent notamment à l’import CSV et aux types par défaut.
 
 ## Modules supprimés (non utilisés ici)
 
@@ -45,8 +46,8 @@ Comptes Wi‑Fi, sessions, bande passante, MikroTik : **retirés** du code et de
 |------|----------|
 | Public | `GET /tickets/types`, `GET /tickets/available`, `POST /tickets/purchase` |
 | Auth | `POST /auth/login`, `GET /auth/profile` |
-| Admin tickets | `POST /tickets/admin/import`, `POST /tickets/admin/import/recommendations`, `GET /tickets/admin/stats` — voir [docs/API.md](docs/API.md) |
-| Paiements | `GET /payments`, `POST /payments/initiate` (KELPAY, JWT), `POST /payments/:id/complete`, `PUT /payments/:id/status` (admin/agent) — guide frontend : [docs/FRONTEND_PAIEMENTS_KELPAY.md](docs/FRONTEND_PAIEMENTS_KELPAY.md) |
+| Admin tickets | `POST /tickets/admin/import`, `POST /tickets/admin/import/recommendations`, `GET /tickets/admin/stats` — détail dans [docs/README.md](docs/README.md) |
+| Paiements | `GET /payments`, `POST /payments/initiate` (KELPAY, JWT), `kelpay/verify`, `kelpay/confirm`, `kelpay/cancel`, `POST /payments/:id/complete`, `PUT /payments/:id/status` — idem [docs/README.md](docs/README.md) |
 | Dashboard | `GET /dashboard/stats`, `GET /dashboard/charts?days=7`, `GET /dashboard/my-stats` |
 
 ## Déploiement (Railway / Render)

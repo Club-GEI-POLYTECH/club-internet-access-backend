@@ -12,7 +12,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = (configService.get<string>('JWT_SECRET') ?? '').trim();
     if (!secret) {
-      throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.example).');
+      throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.local.example).');
     }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

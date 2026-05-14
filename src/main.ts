@@ -78,7 +78,7 @@ async function bootstrap() {
         '**Prix** : stockés sur `ticket_types` (durées 24h / 7j / 30j), pas sur chaque ligne `tickets`.',
         'Pour KELPAY, `amount` = `ticket.ticketType.price`.',
         '',
-        'Documentation Markdown : voir `docs/API.md` dans le dépôt.',
+        'Documentation Markdown : voir `docs/README.md` dans le dépôt.',
       ].join('\n'),
     )
     .setVersion('1.0')

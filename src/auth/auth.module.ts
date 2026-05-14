@@ -23,7 +23,7 @@ import { PendingRegistration } from '../entities/pending-registration.entity';
       useFactory: async (configService: ConfigService) => {
         const secret = (configService.get<string>('JWT_SECRET') ?? '').trim();
         if (!secret) {
-          throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.example).');
+          throw new Error('JWT_SECRET doit être défini dans le fichier .env (voir .env.local.example).');
         }
         return {
           secret,
