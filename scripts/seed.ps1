@@ -1,4 +1,4 @@
-# Seed TypeScript (admin + comptes dev si SEED_DEV_PASSWORD). PostgreSQL doit être joignable (voir .env).
+# Seed TypeScript (types tickets + admin). PostgreSQL : voir .env (DATABASE_URL).
 # Usage : .\scripts\seed.ps1
 
 $ErrorActionPreference = "Stop"
@@ -9,8 +9,7 @@ try {
     npm run seed:admin
     Write-Host ""
     Write-Host "Seed terminé." -ForegroundColor Green
-    Write-Host "  Admin : ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD"
-    Write-Host "  Dev : SEED_DEV_PASSWORD -> agent@unikin.cd, student@student.unikin.cd"
+    Write-Host "  Admin par défaut : president@clubgei-polytech.org (surcharge : ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD)"
 }
 finally {
     Pop-Location

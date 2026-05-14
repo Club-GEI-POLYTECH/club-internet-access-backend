@@ -2,7 +2,6 @@ import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
 import { DataSource } from 'typeorm';
 import { seedAdmin } from './admin.seed';
-import { seedDevData } from './dev-data.seed';
 import { seedTicketTypes } from './ticket-types.seed';
 
 // ts-node n’injecte pas .env (contrairement à Nest). Charger explicitement la racine du projet.
@@ -52,11 +51,6 @@ async function runSeed() {
     console.log('');
 
     await seedAdmin(dataSource);
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('');
-      await seedDevData(dataSource);
-    }
 
     await dataSource.destroy();
     console.log('\n✅ Seed completed');

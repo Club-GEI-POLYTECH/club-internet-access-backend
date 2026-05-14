@@ -24,7 +24,7 @@ npm run seed:admin
 npm run start:dev
 ```
 
-Pour la production, utiliser **`.env.production.example`** comme base (secrets et URLs à renseigner sur l’hébergeur ou dans `.env` local de déploiement).
+Pour la production, utiliser **`.env.production.example`** comme base (secrets et URLs à renseigner sur l’hébergeur ou dans `.env` local de déploiement). Le seed **`npm run seed:admin`** crée les types de tickets puis un **compte admin** (par défaut `president@clubgei-polytech.org` ; surcharge via `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD`).
 
 - **Swagger (OpenAPI)** : `{origin}/api` — bouton **Authorize** → schéma **JWT** (Bearer) avec le token de `POST /api/auth/login`.
 - **Référence détaillée des chemins** : sections ci-dessous ; la source interactive reste Swagger.
@@ -42,7 +42,7 @@ Modèles à la racine : **`.env.local.example`** (développement), **`.env.produ
 | App | `PORT`, `NODE_ENV`, `FRONTEND_URL`, `APP_NAME` |
 | Prix catalogue à l’import | `TICKET_PRICE_24H`, `TICKET_PRICE_7D`, `TICKET_PRICE_30D` (CDF) — le prix affiché / payé vient de **`ticket_types.price`** |
 | Emails | `RESEND_*` ou `SMTP_*`, `REGISTRATION_*` |
-| Seed | `ADMIN_SEED_*`, `SEED_DEV_PASSWORD` (hors prod) |
+| Seed | `ADMIN_SEED_*` (optionnel ; sinon admin par défaut `president@clubgei-polytech.org` au `npm run seed:admin`) |
 | KELPAY | `KELPAY_MERCHANT_CODE`, `KELPAY_TOKEN`, `KELPAY_CALLBACK_URL` ou `PUBLIC_API_URL` / `RAILWAY_PUBLIC_DOMAIN`, etc. |
 
 Les endpoints Keccel sont définis dans le code (`src/kelpay/kelpay.constants.ts`), pas dans `.env`.
@@ -252,6 +252,11 @@ L’utilisateur peut **fermer l’app** entre les étapes ; le backend n’impos
 
 - **Swagger** : tag **Kelpay**, **Tickets**, **Auth**, etc. sur `/api`.
 - **Déploiement** : `npm ci`, `npm run build`, `node dist/main.js` — `railway.json` / `railway.toml`, `render.yaml` si présents ; `DATABASE_URL` obligatoire.
+
+### Production : variables et seeds
+
+1. Reprenez **`.env.production.example`** : copiez chaque clé dans les variables d’environnement de l’hébergeur (ou dans un `.env` local de déploiement non versionné). **`ADMIN_SEED_EMAIL`** / **`ADMIN_SEED_PASSWORD`** sont optionnels : s’ils sont vides, le seed utilise l’admin par défaut (`president@clubgei-polytech.org`, mot de passe dans le code).
+2. **Premier remplissage de la base** : depuis une machine avec le repo et `npm install`, un fichier **`.env`** contenant la **`DATABASE_URL` de production**, exécutez **`npm run seed:admin`** (voir aussi la section *Déploiement* du README racine). Réexécuter plus tard ne recrée pas un second admin si l’email existe déjà.
 
 ### Hors périmètre de cette API
 

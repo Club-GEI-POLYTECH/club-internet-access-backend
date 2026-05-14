@@ -1,5 +1,5 @@
 -- Script SQL pour insérer des données de test (VESTIGE — non utilisé par scripts/seed.ps1 ni seed.sh).
--- Préférez : npm run seed:admin (admin + 1 agent + 1 étudiant si SEED_DEV_PASSWORD).
+-- Préférez : npm run seed:admin (types tickets + admin president@clubgei-polytech.org par défaut).
 -- ⚠️ Ce fichier utilise un hash bcrypt fixe pour "password123" (moins sûr que le seed TypeScript).
 
 -- Hash bcrypt pour "password123" (utilisé pour tous les utilisateurs)
