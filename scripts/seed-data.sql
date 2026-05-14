@@ -220,20 +220,6 @@ SELECT
   NOW()
 WHERE NOT EXISTS (SELECT 1 FROM payments WHERE "transactionId" = 'MTN003');
 
--- Paiement cash
-INSERT INTO payments (id, amount, status, method, "transactionId", "createdById", notes, "createdAt", "updatedAt")
-SELECT 
-  '20000000-0000-0000-0000-000000000004',
-  5000,
-  'completed',
-  'cash',
-  'CASH001',
-  (SELECT id FROM users WHERE email = 'agent1@unikin.cd' LIMIT 1),
-  'Paiement test - Espèces',
-  NOW() - INTERVAL '3 days',
-  NOW()
-WHERE NOT EXISTS (SELECT 1 FROM payments WHERE "transactionId" = 'CASH001');
-
 -- Paiement échoué
 INSERT INTO payments (id, amount, status, method, "transactionId", "phoneNumber", "createdById", notes, "createdAt", "updatedAt")
 SELECT 

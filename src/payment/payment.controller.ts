@@ -20,7 +20,7 @@ export class PaymentController {
   @ApiOperation({
     summary: 'Compléter un paiement (ex. ticket)',
     description:
-      'Marque le paiement comme **complété** et finalise la vente du ticket si applicable. **Admin / agent** : tout paiement complétable. **Étudiant** : uniquement **ses** paiements ; espèces / carte en attente OK ; **Mobile Money Kelpay** encore `pending`/`processing` → utiliser `POST .../kelpay/confirm` ; si déjà `success` (Kelpay), cet appel peut passer le paiement en `completed` (idempotent si déjà `completed`).',
+      'Marque le paiement comme **complété** et finalise la vente du ticket si applicable. **Admin / agent** : tout paiement complétable. **Étudiant** : uniquement **ses** paiements ; carte (hors Kelpay) en attente OK ; **Mobile Money Kelpay** encore `pending`/`processing` → utiliser `POST .../kelpay/confirm` ; si déjà `success` (Kelpay), cet appel peut passer le paiement en `completed` (idempotent si déjà `completed`).',
   })
   @ApiParam({ name: 'id', description: 'UUID du paiement' })
   @ApiBody({

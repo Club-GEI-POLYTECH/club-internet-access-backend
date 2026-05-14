@@ -8,7 +8,7 @@ export class CreatePaymentDto {
   @Min(0)
   amount: number;
 
-  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.MOBILE_MONEY, description: 'Méthode de paiement' })
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.MOBILE_MONEY, description: 'Méthode (`mobile_money` ou `card` — pas d’espèces)' })
   @IsEnum(PaymentMethod)
   method: PaymentMethod;
 

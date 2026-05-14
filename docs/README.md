@@ -1,6 +1,6 @@
 # Club Internet Access — documentation backend
 
-API **NestJS** : import CSV (Mikhmon), catalogue par durée (**24h / 7j / 30j**), vente (espèces ou **KELPAY**), dashboard, authentification.
+API **NestJS** : import CSV (Mikhmon), catalogue par durée (**24h / 7j / 30j**), vente (**KELPAY** Mobile Money et flux catalogue), dashboard, authentification.
 
 ## Sommaire
 
@@ -78,8 +78,8 @@ Les endpoints Keccel sont définis dans le code (`src/kelpay/kelpay.constants.ts
 
 | Flux | Route principale |
 |------|------------------|
-| Mobile Money | `POST /api/payments/initiate` puis `kelpay/verify`, `kelpay/confirm` (voir section KELPAY) ; callback `POST /api/payments/callback` |
-| Espèces / autre | `POST /api/tickets/purchase` (ex. `method: "cash"`) |
+| Mobile Money (Kelpay) | `POST /api/payments/initiate` puis `kelpay/verify`, `kelpay/confirm` (voir section KELPAY) ; callback `POST /api/payments/callback` |
+| Hors Kelpay (ex. carte) | `POST /api/tickets/purchase` avec `method: "card"` — complétion éventuelle via `POST /api/payments/:id/complete` (rôles autorisés) |
 
 Enchaînement typique : ticket **`available`** → **`reserved`** → paiement créé (`amount` = `ticket_types.price`) → ticket lié (`paymentId`) → après confirmation **`sold`** (`soldAt`, `soldTo`). En cas d’échec : retour **`available`**, `paymentId` vidé si applicable.
 
@@ -161,7 +161,7 @@ En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` 
 | GET | `/api/tickets/types/:id` | Non | Détail type |
 | GET | `/api/tickets/type/:typeId` | Non | Tickets dispo par type |
 | GET | `/api/tickets/:id` | Non | Détail (`password` masqué) |
-| POST | `/api/tickets/purchase` | JWT | Achat (ex. cash) |
+| POST | `/api/tickets/purchase` | JWT | Réservation + paiement en attente (ex. `method: "card"` — pas d’espèces) |
 | GET | `/api/tickets/me` | JWT | Tickets achetés |
 | POST | `/api/tickets/:id/reserve` | Non | Réserver |
 | POST | `/api/tickets/:id/release` | Non | Libérer |
@@ -224,9 +224,8 @@ Le frontend **n’appelle jamais** Kelpay directement ; uniquement cette API (JW
 | Parcours | Routes | Remarque |
 |----------|--------|----------|
 | KELPAY | `initiate` → `verify` → `confirm` (optionnel) | Entre-temps : **`kelpay/cancel`** si abandon |
-| Espèces | `POST /api/tickets/purchase` avec `method: "cash"` | Ne pas mélanger avec `initiate` pour le même flux MM |
 
-Ne pas utiliser `POST /api/tickets/purchase` avec `mobile_money` si vous utilisez **`initiate`** pour Kelpay.
+Ne pas utiliser `POST /api/tickets/purchase` avec `mobile_money` si vous utilisez **`initiate`** pour Kelpay (deux flux distincts).
 
 ### Corps `POST /api/payments/initiate`
 
@@ -262,7 +261,7 @@ L’utilisateur peut **fermer l’app** entre les étapes ; le backend n’impos
 | `success` | Confirmé — ticket vendu |
 | `failed` | Ticket libéré |
 | `expired` | Selon métier |
-| `completed` | Flux manuel (ex. espèces complétées par admin) |
+| `completed` | Vente finalisée (`kelpay/confirm`, callback, ou `POST /api/payments/:id/complete` selon le flux) |
 
 ### Erreurs utiles
 

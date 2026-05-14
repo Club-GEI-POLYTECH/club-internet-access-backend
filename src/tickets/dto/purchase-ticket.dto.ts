@@ -21,7 +21,7 @@ export class PurchaseTicketDto {
   phoneNumber: string;
 
   @ApiProperty({
-    description: 'Méthode de paiement',
+    description: 'Méthode de paiement (`mobile_money` ou `card` — pas d’espèces)',
     enum: PaymentMethod,
     example: PaymentMethod.MOBILE_MONEY,
   })

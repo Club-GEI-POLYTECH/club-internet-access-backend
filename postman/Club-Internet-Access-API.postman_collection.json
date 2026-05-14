@@ -293,6 +293,7 @@
         },
         {
           "name": "Purchase Ticket",
+          "description": "Réservation + paiement `pending`. `method` : `mobile_money` ou `card` (les espèces ne sont plus supportées). Pour Mobile Money Kelpay, préférer le dossier **KELPAY** (`initiate`…), pas ce corps avec `mobile_money` en parallèle.",
           "event": [
             {
               "listen": "test",
@@ -317,7 +318,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"method\": \"mobile_money\"\n}"
+              "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"method\": \"card\"\n}"
             },
             "url": "{{baseUrl}}/api/tickets/purchase"
           }
@@ -416,7 +417,7 @@
     },
     {
       "name": "Payments",
-      "description": "Paiements : achat `POST /tickets/purchase`. **KELPAY** : initiate → verify → confirm ; **`POST /payments/{{paymentId}}/kelpay/cancel`** pour abandonner tant que `pending`/`processing`. Callback Kelpay peut finaliser en parallèle. **Admin** : `POST /payments/:id/complete` (autre flux, rôle admin/agent).",
+      "description": "Flux **KELPAY** : initiate → verify → confirm ; cancel si abandon. **Hors Kelpay** : `POST /tickets/purchase` (`card`, etc. — plus d’espèces). Callback Kelpay en parallèle. **Admin** : `POST /payments/:id/complete` si besoin.",
       "item": [
         {
           "name": "KELPAY (3 étapes + cancel)",

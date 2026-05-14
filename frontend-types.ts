@@ -93,23 +93,6 @@ export interface Ticket {
   updatedAt?: string;
 }
 
-export interface PurchaseTicketRequest {
-  ticketId: string;
-  phoneNumber: string;
-  method: 'mobile_money' | 'cash';
-}
-
-export interface PurchaseTicketResponse {
-  ticket: Ticket;
-  payment: Payment;
-  credentials: {
-    username: string;
-    password: string;
-    profile: string;
-    instructions: string;
-  };
-}
-
 export interface ImportTypeRecommendation {
   typeKey: '24h' | '7j' | '30j';
   typeLabel: string;
@@ -160,7 +143,6 @@ export enum PaymentStatus {
 
 export enum PaymentMethod {
   MOBILE_MONEY = 'mobile_money',
-  CASH = 'cash',
   CARD = 'card',
 }
 
@@ -181,6 +163,24 @@ export interface Payment {
   createdById?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+/** Corps de `POST /tickets/purchase` (hors flux KELPAY `initiate` — ex. carte). */
+export interface PurchaseTicketRequest {
+  ticketId: string;
+  phoneNumber: string;
+  method: PaymentMethod;
+}
+
+export interface PurchaseTicketResponse {
+  ticket: Ticket;
+  payment: Payment;
+  credentials: {
+    username: string;
+    password: string;
+    profile: string;
+    instructions: string;
+  };
 }
 
 export interface CompletePaymentRequest {
@@ -332,6 +332,5 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
 
 export const paymentMethodLabels: Record<PaymentMethod, string> = {
   [PaymentMethod.MOBILE_MONEY]: 'Mobile Money',
-  [PaymentMethod.CASH]: 'Espèces',
   [PaymentMethod.CARD]: 'Carte',
 };
