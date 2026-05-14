@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Payment, PaymentStatus } from '../entities/payment.entity';
-import { User } from '../entities/user.entity';
+import { User, UserRole } from '../entities/user.entity';
 import { Ticket, TicketStatus } from '../entities/ticket.entity';
 import { andCatalogAvailableForTicket } from '../tickets/catalog-available.query';
 
@@ -29,6 +29,8 @@ export class DashboardService {
       totalRevenue,
       totalUsers,
       activeUsers,
+      inactiveUsers,
+      usersByRoleRows,
       ticketsTotal,
       ticketsAvailable,
       ticketsSold,
@@ -54,6 +56,13 @@ export class DashboardService {
         .getRawOne(),
       this.usersRepository.count(),
       this.usersRepository.count({ where: { isActive: true } }),
+      this.usersRepository.count({ where: { isActive: false } }),
+      this.usersRepository
+        .createQueryBuilder('user')
+        .select('user.role', 'role')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('user.role')
+        .getRawMany(),
       this.ticketsRepository.count(),
       andCatalogAvailableForTicket(this.ticketsRepository.createQueryBuilder('ticket')).getCount(),
       this.ticketsRepository.count({ where: { status: TicketStatus.SOLD } }),
@@ -66,11 +75,36 @@ export class DashboardService {
         .getRawOne(),
     ]);
 
-    const recentPayments = await this.paymentsRepository.find({
-      take: 15,
-      order: { createdAt: 'DESC' },
-      relations: ['ticket', 'createdBy'],
-    });
+    const byRole = { admin: 0, agent: 0, student: 0 };
+    for (const row of usersByRoleRows as { role: UserRole; count: string }[]) {
+      const n = parseInt(row.count, 10) || 0;
+      if (row.role === UserRole.ADMIN) byRole.admin = n;
+      else if (row.role === UserRole.AGENT) byRole.agent = n;
+      else if (row.role === UserRole.STUDENT) byRole.student = n;
+    }
+
+    const [recentPayments, recentUsers] = await Promise.all([
+      this.paymentsRepository.find({
+        take: 15,
+        order: { createdAt: 'DESC' },
+        relations: ['ticket', 'createdBy'],
+      }),
+      this.usersRepository
+        .createQueryBuilder('user')
+        .select([
+          'user.id',
+          'user.email',
+          'user.firstName',
+          'user.lastName',
+          'user.role',
+          'user.isActive',
+          'user.phone',
+          'user.createdAt',
+        ])
+        .orderBy('user.createdAt', 'DESC')
+        .take(15)
+        .getMany(),
+    ]);
 
     return {
       payments: {
@@ -90,9 +124,12 @@ export class DashboardService {
       users: {
         total: totalUsers,
         active: activeUsers,
+        inactive: inactiveUsers,
+        byRole,
       },
       recent: {
         payments: recentPayments,
+        users: recentUsers,
       },
     };
   }

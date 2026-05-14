@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Club Internet Access API",
-    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
+    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`.\n\n**Dashboard** : `GET /api/dashboard/stats` (admin/agent) renvoie notamment `users.byRole`, `users.inactive`, `recent.users`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -534,9 +534,11 @@
     },
     {
       "name": "Dashboard",
+      "description": "**Rôles** : `GET …/stats` et `GET …/charts` exigent un JWT **admin** ou **agent**. `GET …/my-stats` : tout utilisateur authentifié.\n\n**Stats** : agrégats paiements / tickets / utilisateurs + listes récentes (`recent.payments`, `recent.users`).",
       "item": [
         {
           "name": "My Stats",
+          "description": "Compteur de paiements liés au compte connecté (`{ paymentsCount }`). JWT requis.",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
@@ -545,6 +547,7 @@
         },
         {
           "name": "Stats (Admin/Agent)",
+          "description": "Statistiques globales. Corps typique :\n\n- `payments` : `total`, `completed`, `pending`, `failed`, `revenue`\n- `tickets` : `total`, `available`, `sold`, `reserved`, `revenue`\n- `users` : `total`, `active`, `inactive`, `byRole` (`admin`, `agent`, `student`)\n- `recent.payments` : derniers paiements (relations `ticket`, `createdBy`)\n- `recent.users` : 15 derniers comptes (champs publics : `id`, `email`, `firstName`, `lastName`, `role`, `isActive`, `phone`, `createdAt` — pas de mot de passe)",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
@@ -553,6 +556,7 @@
         },
         {
           "name": "Charts",
+          "description": "Séries temporelles : `payments` (par jour : `date`, `count`, `revenue`) et `ticketsSold` (`date`, `sold`). Query `days` optionnel (défaut API : 7 ; ici exemple 30).",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],

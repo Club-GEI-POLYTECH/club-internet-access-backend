@@ -266,6 +266,12 @@ export interface KelpayManualCancelResponse {
 
 // --- Dashboard ---
 
+/** Utilisateur dans `GET /dashboard/stats` — champs publics uniquement (pas de mot de passe). */
+export type DashboardUserSummary = Pick<
+  User,
+  'id' | 'email' | 'firstName' | 'lastName' | 'role' | 'isActive' | 'phone' | 'createdAt'
+>;
+
 export interface DashboardStats {
   payments: {
     total: number;
@@ -284,9 +290,16 @@ export interface DashboardStats {
   users: {
     total: number;
     active: number;
+    inactive: number;
+    byRole: {
+      admin: number;
+      agent: number;
+      student: number;
+    };
   };
   recent: {
     payments: Payment[];
+    users: DashboardUserSummary[];
   };
 }
 

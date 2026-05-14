@@ -31,7 +31,8 @@ export class DashboardController {
   @Roles(UserRole.ADMIN, UserRole.AGENT)
   @ApiOperation({
     summary: 'Statistiques vente de tickets',
-    description: 'Paiements, tickets (stock / vendus), utilisateurs — ADMIN/AGENT',
+    description:
+      'Paiements, tickets (stock / vendus), utilisateurs (totaux, par rôle, 15 derniers inscrits sans mot de passe) — ADMIN/AGENT',
   })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {
