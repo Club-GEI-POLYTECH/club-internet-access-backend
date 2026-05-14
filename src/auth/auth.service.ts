@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../common/services/email.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -29,7 +29,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private notificationsService: NotificationsService,
+    private emailService: EmailService,
     @InjectRepository(PasswordResetToken)
     private passwordResetTokenRepository: Repository<PasswordResetToken>,
     @InjectRepository(PendingRegistration)
@@ -132,7 +132,7 @@ export class AuthService {
     await this.pendingRegistrationRepository.save(pending);
 
     try {
-      await this.notificationsService.sendRegistrationVerificationEmail(
+      await this.emailService.sendRegistrationVerificationEmail(
         email,
         pending.firstName,
         code,
@@ -140,8 +140,13 @@ export class AuthService {
     } catch (err: any) {
       await this.pendingRegistrationRepository.delete({ id: pending.id });
       this.logger.error(`Échec envoi code inscription ${email}`, err?.stack);
+      const detail =
+        typeof err?.message === 'string' && err.message.length > 0 && err.message.length < 500
+          ? err.message
+          : null;
       throw new BadRequestException(
-        'Impossible d’envoyer l’email de vérification. Vérifiez la configuration SMTP ou réessayez plus tard.',
+        detail ??
+          'Impossible d’envoyer l’email de vérification. Vérifiez RESEND_API_KEY et RESEND_FROM_EMAIL (ou RESEND_FROM), puis réessayez.',
       );
     }
 
@@ -235,15 +240,20 @@ export class AuthService {
     await this.pendingRegistrationRepository.save(pending);
 
     try {
-      await this.notificationsService.sendRegistrationVerificationEmail(
+      await this.emailService.sendRegistrationVerificationEmail(
         email,
         pending.firstName,
         code,
       );
     } catch (err: any) {
       this.logger.error(`Échec renvoi code inscription ${email}`, err?.stack);
+      const detail =
+        typeof err?.message === 'string' && err.message.length > 0 && err.message.length < 500
+          ? err.message
+          : null;
       throw new BadRequestException(
-        'Impossible d’envoyer l’email. Vérifiez la configuration SMTP ou réessayez plus tard.',
+        detail ??
+          'Impossible d’envoyer l’email. Vérifiez RESEND_API_KEY et RESEND_FROM_EMAIL (ou RESEND_FROM), puis réessayez.',
       );
     }
 
@@ -291,7 +301,7 @@ export class AuthService {
 
     // Envoyer l'email de réinitialisation
     try {
-      await this.notificationsService.sendPasswordResetEmail(
+      await this.emailService.sendPasswordResetEmail(
         user.email,
         user.firstName || user.email,
         resetUrl,

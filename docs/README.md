@@ -41,11 +41,13 @@ Modèles à la racine : **`.env.local.example`** (développement), **`.env.produ
 | Sécurité | `JWT_SECRET`, `TICKET_ENCRYPTION_KEY` (min. 32 caractères recommandé pour les tickets) |
 | App | `PORT`, `NODE_ENV`, `FRONTEND_URL`, `APP_NAME` |
 | Prix catalogue à l’import | `TICKET_PRICE_24H`, `TICKET_PRICE_7D`, `TICKET_PRICE_30D` (CDF) — le prix affiché / payé vient de **`ticket_types.price`** |
-| Emails | `RESEND_*` ou `SMTP_*`, `REGISTRATION_*` |
+| Emails | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (recommandé) ou `RESEND_FROM` (alias), `REGISTRATION_*` |
 | Seed | `ADMIN_SEED_*` (optionnel ; sinon admin par défaut `president@clubgei-polytech.org` au `npm run seed:admin`) |
 | KELPAY | `KELPAY_MERCHANT_CODE`, `KELPAY_TOKEN`, `KELPAY_CALLBACK_URL` ou `PUBLIC_API_URL` / `RAILWAY_PUBLIC_DOMAIN`, etc. |
 
 Les endpoints Keccel sont définis dans le code (`src/kelpay/kelpay.constants.ts`), pas dans `.env`.
+
+**Emails (Resend)** : le service **`EmailService`** (`src/common/services/email.service.ts`) est fourni par **`CommonModule`** (`@Global()`). **`AuthService`** l’injecte pour l’inscription (code) et la réinitialisation mot de passe. Même schéma que sur l’app de référence : `sendEmail` privé + méthodes métier (`html` + `text`).
 
 ---
 
