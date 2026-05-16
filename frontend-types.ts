@@ -255,7 +255,8 @@ export interface PaymentListItem {
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  ticket?: Pick<Ticket, 'id' | 'username' | 'status' | 'profile'>;
+  /** `username` présent seulement si l’appelant est **admin**. */
+  ticket?: Pick<Ticket, 'id' | 'status' | 'profile'> & { username?: string };
   createdBy?: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'role'>;
 }
 

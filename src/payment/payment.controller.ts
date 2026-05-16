@@ -68,7 +68,7 @@ export class PaymentController {
   @ApiOperation({
     summary: 'Lister les paiements (paginé)',
     description:
-      'Réponse `{ data, meta }`. Étudiant : ses paiements uniquement. Admin/agent : tous (+ filtres). Sans `providerResponse` dans la liste.',
+      'Réponse `{ data, meta }`. Étudiant/agent : pas de `ticket.username` ni `notes` (login Wi‑Fi). Admin : champs complets. Sans `providerResponse` dans la liste.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })

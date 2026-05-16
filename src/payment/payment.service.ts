@@ -147,9 +147,11 @@ export class PaymentService {
     }
 
     const [payments, total] = await qb.getManyAndCount();
+    const isAdmin = auth.role === UserRole.ADMIN;
+    const listOptions = { includeTicketUsername: isAdmin, includeNotes: isAdmin };
 
     return {
-      data: payments.map(toPaymentListItem),
+      data: payments.map((p) => toPaymentListItem(p, listOptions)),
       meta: buildPaginationMeta(page, limit, total),
     };
   }

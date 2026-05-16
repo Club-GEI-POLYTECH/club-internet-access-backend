@@ -2,9 +2,17 @@ import { Payment, PaymentMethod, PaymentStatus } from '../entities/payment.entit
 
 export interface PaymentListTicketSummary {
   id: string;
-  username: string;
+  /** Réservé admin (liste paiements). */
+  username?: string;
   status: string;
   profile: string;
+}
+
+export interface PaymentListSerializeOptions {
+  /** `true` uniquement pour JWT admin. */
+  includeTicketUsername?: boolean;
+  /** `true` uniquement pour admin (`notes` peut contenir le login Wi‑Fi). */
+  includeNotes?: boolean;
 }
 
 export interface PaymentListCreatedBySummary {
@@ -37,7 +45,13 @@ function normalizeAmount(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function toPaymentListItem(payment: Payment): PaymentListItem {
+export function toPaymentListItem(
+  payment: Payment,
+  options: PaymentListSerializeOptions = {},
+): PaymentListItem {
+  const includeTicketUsername = options.includeTicketUsername === true;
+  const includeNotes = options.includeNotes === true;
+
   const item: PaymentListItem = {
     id: payment.id,
     amount: normalizeAmount(payment.amount),
@@ -48,17 +62,20 @@ export function toPaymentListItem(payment: Payment): PaymentListItem {
     phoneNumber: payment.phoneNumber ?? undefined,
     ticketId: payment.ticketId ?? undefined,
     createdById: payment.createdById ?? undefined,
-    notes: payment.notes ?? undefined,
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt,
   };
 
+  if (includeNotes && payment.notes) {
+    item.notes = payment.notes;
+  }
+
   if (payment.ticket) {
     item.ticket = {
       id: payment.ticket.id,
-      username: payment.ticket.username,
       status: payment.ticket.status,
       profile: payment.ticket.profile,
+      ...(includeTicketUsername ? { username: payment.ticket.username } : {}),
     };
   }
 

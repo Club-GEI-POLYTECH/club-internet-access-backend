@@ -189,7 +189,7 @@ Types : `PaginatedResponse`, `UserListItem`, `ListUsersParams` dans **`frontend-
 
 **Query** : `page`, `limit` (déf. 20, max 100), `status`, `method`, `search`, `createdById` (admin/agent uniquement).
 
-**Liste allégée** : pas de `providerResponse` ; `amount` en **number** ; résumés `ticket` / `createdBy`.
+**Liste allégée** : pas de `providerResponse` ; `amount` en **number** ; résumés `ticket` / `createdBy`. **Étudiant / agent** : pas de `ticket.username` ni `notes` (évite de fuiter le login Wi‑Fi). **Admin** : `ticket.username` et `notes` présents.
 
 **Détail** : `GET /api/payments/:id` renvoie toujours le paiement complet (y compris `providerResponse` si présent).
 
