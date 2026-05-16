@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Club Internet Access API",
-    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`, `paymentWebhookSecret` (= `TICKETS_PAYMENT_WEBHOOK_SECRET` pour la requête **Webhook Payment**).\n\n**Dashboard** : `GET /api/dashboard/stats` (admin/agent) renvoie notamment `users.byRole`, `users.inactive`, `recent.users`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
+    "description": "Vente de tickets Wi‑Fi (import CSV Mikhmon) — auth, tickets, paiements, dashboard, utilisateurs.\n\nVariables : `baseUrl` (ex. http://localhost:4000), `token` (rempli après Login). Optionnel : `userId`, `paymentId`, `ticketId`, `typeId`, `transactionId`, `paymentWebhookSecret` (= `TICKETS_PAYMENT_WEBHOOK_SECRET` pour la requête **Webhook Payment**).\n\n**Dashboard** : `GET /api/dashboard/stats` (admin/agent) — `users.byRole`, `tickets.byTicketType`, `recent.users`, `recent.tickets`.\n\n**Keccel direct** : `keccelMerchantCode`, `keccelToken` (Bearer = `KELPAY_TOKEN`), `kelpayTransactionId` (id transaction Kelpay, ex. retour initiate).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -179,10 +179,22 @@
       "item": [
         {
           "name": "List Users",
+          "description": "Paginé : `{ data, meta }`. Query : `page`, `limit`, `paymentsLimit`, `role`, `search`. Sans `providerResponse` sur les paiements.",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/users"
+            "url": {
+              "raw": "{{baseUrl}}/api/users?page=1&limit=20&paymentsLimit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "paymentsLimit", "value": "10" },
+                { "key": "role", "value": "student", "disabled": true },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
           }
         },
         {
@@ -238,17 +250,19 @@
       "item": [
         {
           "name": "List Tickets",
+          "description": "Inventaire complet — JWT **admin** ou **agent** requis.",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/tickets"
           }
         },
         {
           "name": "List Tickets (by status)",
+          "description": "Filtre par statut — JWT **admin** ou **agent** requis.",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": "{{baseUrl}}/api/tickets?status=available"
           }
         },
@@ -293,6 +307,24 @@
           }
         },
         {
+          "name": "My Tickets (paginated)",
+          "description": "JWT requis — tickets liés aux paiements de l'utilisateur. `{ data, meta }`. Query : `page`, `limit`, `status` (ex. sold).",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/me?page=1&limit=10&status=sold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "me"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "sold" }
+              ]
+            }
+          }
+        },
+        {
           "name": "Purchase Ticket",
           "description": "Réservation + paiement `pending`. `method` : `mobile_money` ou `card` (les espèces ne sont plus supportées). Pour Mobile Money Kelpay, préférer le dossier **KELPAY** (`initiate`…), pas ce corps avec `mobile_money` en parallèle.",
           "event": [
@@ -322,22 +354,6 @@
               "raw": "{\n  \"ticketId\": \"{{ticketId}}\",\n  \"phoneNumber\": \"+243900000000\",\n  \"method\": \"card\"\n}"
             },
             "url": "{{baseUrl}}/api/tickets/purchase"
-          }
-        },
-        {
-          "name": "Reserve Ticket",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": "{{baseUrl}}/api/tickets/{{ticketId}}/reserve"
-          }
-        },
-        {
-          "name": "Release Ticket",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": "{{baseUrl}}/api/tickets/{{ticketId}}/release"
           }
         },
         {
@@ -483,10 +499,19 @@
         },
         {
           "name": "List Payments",
+          "description": "Paginé `{ data, meta }`. Query : `page`, `limit`, `status`, `method`, `search`, `createdById` (admin/agent).",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
-            "url": "{{baseUrl}}/api/payments"
+            "url": {
+              "raw": "{{baseUrl}}/api/payments?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
           }
         },
         {
@@ -539,7 +564,7 @@
     },
     {
       "name": "Dashboard",
-      "description": "**Rôles** : `GET …/stats` et `GET …/charts` exigent un JWT **admin** ou **agent**. `GET …/my-stats` : tout utilisateur authentifié.\n\n**Stats** : agrégats paiements / tickets / utilisateurs + listes récentes (`recent.payments`, `recent.users`).",
+      "description": "**Rôles** : `GET …/stats` et `GET …/charts` exigent un JWT **admin** ou **agent**. `GET …/my-stats` : tout utilisateur authentifié.\n\n**Stats** : agrégats + `tickets.byTicketType` (par forfait) + `recent.payments`, `recent.users`, `recent.tickets`.",
       "item": [
         {
           "name": "My Stats",
@@ -552,7 +577,7 @@
         },
         {
           "name": "Stats (Admin/Agent)",
-          "description": "Statistiques globales. Corps typique :\n\n- `payments` : `total`, `completed`, `pending`, `failed`, `revenue`\n- `tickets` : `total`, `available`, `sold`, `reserved`, `revenue`\n- `users` : `total`, `active`, `inactive`, `byRole` (`admin`, `agent`, `student`)\n- `recent.payments` : derniers paiements (relations `ticket`, `createdBy`)\n- `recent.users` : 15 derniers comptes (champs publics : `id`, `email`, `firstName`, `lastName`, `role`, `isActive`, `phone`, `createdAt` — pas de mot de passe)",
+          "description": "Statistiques globales. Corps typique :\n\n- `payments` : `total`, `completed` (payés = success+completed), `pending` (PENDING seul), `processing`, `cancelled`, `failed` (failed+expired), `revenue` — `recent.payments[].amount` est un **number**\n- `tickets` : `total`, `available`, `sold`, `reserved`, `revenue`, **`byTicketType`** (tableau par forfait : `ticketTypeId`, `name`, `price`, `total`, `available`, `sold`, `reserved`, `revenue`)\n- `users` : `total`, `active`, `inactive`, `byRole`\n- `recent.payments` : 15 derniers (relation `ticket` via `ticketId`, mot de passe masqué)\n- `recent.users` : 15 derniers comptes (sans mot de passe)\n- `recent.tickets` : 15 derniers tickets importés (sans mot de passe Wi‑Fi)",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],

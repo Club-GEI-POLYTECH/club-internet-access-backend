@@ -1,11 +1,12 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../entities/user.entity';
 import { PaymentStatus } from '../entities/payment.entity';
+import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 
 @ApiTags('Payments')
 @ApiBearerAuth('JWT-auth')
@@ -65,13 +66,23 @@ export class PaymentController {
 
   @Get()
   @ApiOperation({
-    summary: 'Lister les paiements',
-    description: 'Les étudiants ne voient que leurs paiements (createdById)',
+    summary: 'Lister les paiements (paginé)',
+    description:
+      'Réponse `{ data, meta }`. Étudiant : ses paiements uniquement. Admin/agent : tous (+ filtres). Sans `providerResponse` dans la liste.',
   })
-  @ApiResponse({ status: 200, description: 'Liste des paiements' })
-  async findAll(@Request() req) {
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'status', required: false, enum: PaymentStatus })
+  @ApiQuery({ name: 'method', required: false, enum: ['mobile_money', 'card'] })
+  @ApiQuery({ name: 'createdById', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Page de paiements' })
+  async findAll(@Query() query: ListPaymentsQueryDto, @Request() req) {
     this.logger.log(`GET /payments userId=${req.user?.userId} role=${req.user?.role}`);
-    return await this.paymentService.findAll(req.user?.userId, req.user?.role);
+    return await this.paymentService.findAllPaginated(query, {
+      userId: req.user?.userId,
+      role: req.user?.role,
+    });
   }
 
   @Get('transaction/:transactionId')
@@ -87,6 +98,8 @@ export class PaymentController {
   @Get(':id')
   @ApiOperation({ summary: 'Détail d\'un paiement' })
   @ApiParam({ name: 'id', description: 'UUID du paiement' })
+  @ApiResponse({ status: 403, description: 'Étudiant : paiement d’un autre utilisateur' })
+  @ApiResponse({ status: 404, description: 'Paiement non trouvé' })
   async findOne(@Param('id') id: string, @Request() req) {
     this.logger.log(`GET /payments/${id}`);
     return await this.paymentService.findOne(id, req.user?.userId, req.user?.role);

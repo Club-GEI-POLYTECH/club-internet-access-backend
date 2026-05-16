@@ -32,7 +32,7 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Statistiques vente de tickets',
     description:
-      'Paiements, tickets (stock / vendus), utilisateurs (totaux, par rôle, 15 derniers inscrits sans mot de passe) — ADMIN/AGENT',
+      'Paiements (`completed` = payés, `pending` = PENDING seul, + `processing`, `cancelled`, `failed`), tickets (`byTicketType`), utilisateurs (`byRole`), `recent.*` (15 entrées, `amount` numérique, mots de passe masqués) — ADMIN/AGENT',
   })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {

@@ -6,11 +6,12 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -18,6 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ListUsersQueryDto } from './dto/list-users-query.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth('JWT-auth')
@@ -31,14 +33,20 @@ export class UsersController {
 
   @Get()
   @ApiOperation({
-    summary: 'Lister tous les utilisateurs',
-    description: 'Admin uniquement. Les mots de passe ne sont jamais renvoyés.',
+    summary: 'Lister les utilisateurs (paginé)',
+    description:
+      'Admin uniquement. Réponse `{ data, meta }` : pagination utilisateurs + au plus `paymentsLimit` paiements récents par compte (sans `providerResponse`). Détail complet : `GET /users/:id`.',
   })
-  @ApiResponse({ status: 200, description: 'Liste récupérée avec succès' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'paymentsLimit', required: false, type: Number, example: 10 })
+  @ApiQuery({ name: 'role', required: false, enum: ['admin', 'agent', 'student'] })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Page récupérée avec succès' })
   @ApiResponse({ status: 403, description: 'Rôle insuffisant' })
-  async findAll() {
-    this.logger.log('GET /users');
-    return await this.usersService.findAll();
+  async findAll(@Query() query: ListUsersQueryDto) {
+    this.logger.log(`GET /users page=${query.page ?? 1} limit=${query.limit ?? 20}`);
+    return await this.usersService.findAllPaginated(query);
   }
 
   @Get(':id')

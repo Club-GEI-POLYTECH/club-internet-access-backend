@@ -11,8 +11,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment, PaymentMethod, PaymentStatus } from '../entities/payment.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { UserRole } from '../entities/user.entity';
 import { TicketsWebhookService } from '../tickets/tickets-webhook.service';
+import {
+  buildPaginationMeta,
+  PaginatedResult,
+} from '../common/interfaces/paginated-result.interface';
+import { toPaymentListItem, PaymentListItem } from './payment-list.types';
 
 @Injectable()
 export class PaymentService {
@@ -98,19 +104,54 @@ export class PaymentService {
     return savedPayment;
   }
 
-  async findAll(userId?: string, userRole?: UserRole): Promise<Payment[]> {
-    this.logger.log(`findAll payments userId=${userId ?? 'all'} role=${userRole ?? 'all'}`);
-    const queryBuilder = this.paymentRepository
+  async findAllPaginated(
+    query: ListPaymentsQueryDto,
+    auth: { userId?: string; role?: UserRole },
+  ): Promise<PaginatedResult<PaymentListItem>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    this.logger.log(
+      `findAllPaginated page=${page} limit=${limit} role=${auth.role ?? 'all'} userId=${auth.userId ?? 'all'}`,
+    );
+
+    const qb = this.paymentRepository
       .createQueryBuilder('payment')
       .leftJoinAndSelect('payment.ticket', 'ticket')
       .leftJoinAndSelect('payment.createdBy', 'createdBy')
-      .orderBy('payment.createdAt', 'DESC');
+      .orderBy('payment.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
 
-    if (userRole === UserRole.STUDENT && userId) {
-      queryBuilder.where('payment.createdById = :userId', { userId });
+    if (auth.role === UserRole.STUDENT && auth.userId) {
+      qb.andWhere('payment.createdById = :userId', { userId: auth.userId });
+    } else if (query.createdById) {
+      qb.andWhere('payment.createdById = :createdById', { createdById: query.createdById });
     }
 
-    return await queryBuilder.getMany();
+    if (query.status) {
+      qb.andWhere('payment.status = :status', { status: query.status });
+    }
+
+    if (query.method) {
+      qb.andWhere('payment.method = :method', { method: query.method });
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      qb.andWhere(
+        `(payment.transactionId ILIKE :search OR payment.merchantReference ILIKE :search OR payment.phoneNumber ILIKE :search)`,
+        { search: `%${search}%` },
+      );
+    }
+
+    const [payments, total] = await qb.getManyAndCount();
+
+    return {
+      data: payments.map(toPaymentListItem),
+      meta: buildPaginationMeta(page, limit, total),
+    };
   }
 
   async findOne(id: string, userId?: string, userRole?: UserRole): Promise<Payment> {
@@ -119,10 +160,12 @@ export class PaymentService {
       relations: ['ticket', 'createdBy'],
     });
 
-    if (payment && userRole === UserRole.STUDENT && userId) {
-      if (payment.createdById !== userId) {
-        throw new Error('Payment not found');
-      }
+    if (!payment) {
+      throw new NotFoundException('Paiement introuvable');
+    }
+
+    if (userRole === UserRole.STUDENT && userId && payment.createdById !== userId) {
+      throw new ForbiddenException('Ce paiement ne correspond pas à votre compte');
     }
 
     return payment;
@@ -144,7 +187,7 @@ export class PaymentService {
     });
 
     if (!payment) {
-      throw new Error('Payment not found');
+      throw new NotFoundException('Paiement introuvable');
     }
 
     payment.status = status;

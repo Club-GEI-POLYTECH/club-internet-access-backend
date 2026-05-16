@@ -68,7 +68,7 @@ export class Payment {
   @JoinColumn({ name: 'createdById' })
   createdBy: User;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   createdById: string;
 
   @Column({ type: 'text', nullable: true })
@@ -83,9 +83,10 @@ export class Payment {
   callbackProcessedAt: Date;
 
   @OneToOne(() => Ticket, (ticket) => ticket.payment, { nullable: true })
+  @JoinColumn({ name: 'ticketId', referencedColumnName: 'id' })
   ticket: Ticket;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   ticketId: string;
 
   @CreateDateColumn()

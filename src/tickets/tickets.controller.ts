@@ -29,6 +29,7 @@ import {
 import { TicketsService } from './tickets.service';
 import { TicketTypesService } from './ticket-types.service';
 import { PurchaseTicketDto } from './dto/purchase-ticket.dto';
+import { ListMyTicketsQueryDto } from './dto/list-my-tickets-query.dto';
 import { ImportTicketsDto } from './dto/import-tickets.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { TicketsWebhookService } from './tickets-webhook.service';
@@ -52,9 +53,17 @@ export class TicketsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Liste tous les tickets (avec filtres optionnels)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.AGENT)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Liste tous les tickets (admin / agent)',
+    description: 'Inventaire complet avec filtre optionnel par statut. Catalogue public : GET /tickets/available, /tickets/types.',
+  })
   @ApiQuery({ name: 'status', required: false, enum: TicketStatus, description: 'Filtrer par statut' })
   @ApiResponse({ status: 200, description: 'Liste des tickets' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Rôle insuffisant (admin ou agent requis)' })
   async findAll(@Query('status') status?: TicketStatus) {
     this.logger.log(`GET /tickets${status ? `?status=${status}` : ''}`);
     const tickets = await this.ticketsService.findAll(status);
@@ -109,13 +118,19 @@ export class TicketsController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Liste les tickets achetés par l’utilisateur connecté' })
-  @ApiResponse({ status: 200, description: 'Liste des tickets de l’utilisateur' })
+  @ApiOperation({
+    summary: 'Mes tickets (paginé)',
+    description:
+      'Tickets liés aux paiements de l’utilisateur connecté. Réponse `{ data, meta }` — mot de passe Wi‑Fi en clair si le ticket est `sold`.',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'status', required: false, enum: TicketStatus })
+  @ApiResponse({ status: 200, description: 'Page de tickets de l’utilisateur' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
-  async getMyTickets(@Request() req) {
-    this.logger.log(`GET /tickets/me userId=${req.user?.userId}`);
-    const tickets = await this.ticketsService.findForUser(req.user.userId);
-    return Promise.all(tickets.map((t) => this.ticketsService.serializeTicketForOwner(t)));
+  async getMyTickets(@Query() query: ListMyTicketsQueryDto, @Request() req) {
+    this.logger.log(`GET /tickets/me userId=${req.user?.userId} page=${query.page ?? 1}`);
+    return await this.ticketsService.findForUserPaginated(req.user.userId, query);
   }
 
   @Get(':id')
@@ -178,32 +193,6 @@ export class TicketsController {
       purchaseDto.method,
       req.user.userId,
     );
-  }
-
-  @Post(':id/reserve')
-  @ApiOperation({ summary: 'Réserve un ticket temporairement' })
-  @ApiResponse({ status: 200, description: 'Ticket réservé' })
-  @ApiResponse({ status: 400, description: 'Ticket non disponible' })
-  async reserve(@Param('id') id: string) {
-    this.logger.log(`POST /tickets/${id}/reserve`);
-    const ticket = await this.ticketsService.reserve(id);
-    return {
-      ...ticket,
-      password: '***',
-    };
-  }
-
-  @Post(':id/release')
-  @ApiOperation({ summary: 'Libère un ticket réservé' })
-  @ApiResponse({ status: 200, description: 'Ticket libéré' })
-  @ApiResponse({ status: 400, description: 'Ticket non réservé' })
-  async release(@Param('id') id: string) {
-    this.logger.log(`POST /tickets/${id}/release`);
-    const ticket = await this.ticketsService.release(id);
-    return {
-      ...ticket,
-      password: '***',
-    };
   }
 
   // Endpoints Admin

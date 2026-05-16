@@ -15,6 +15,12 @@ import { TicketType } from '../entities/ticket-type.entity';
 import { Payment, PaymentStatus, PaymentMethod } from '../entities/payment.entity';
 import { PaymentService } from '../payment/payment.service';
 import type { ImportTicketsDto } from './dto/import-tickets.dto';
+import { ListMyTicketsQueryDto } from './dto/list-my-tickets-query.dto';
+import {
+  buildPaginationMeta,
+  PaginatedResult,
+} from '../common/interfaces/paginated-result.interface';
+import { MyTicketListItem, toMyTicketListItem } from './my-ticket-list.types';
 import * as crypto from 'crypto';
 // csv-parse sera installé via npm install csv-parse
 // Pour l'instant, on utilise une implémentation simple de parsing CSV
@@ -326,17 +332,44 @@ export class TicketsService implements OnModuleInit {
     };
   }
 
-  async findForUser(userId: string): Promise<Ticket[]> {
-    this.logger.log(`findForUser userId=${userId}`);
-    return await this.ticketsRepository.find({
-      where: {
-        payment: {
-          createdById: userId,
-        } as any,
-      },
-      relations: ['ticketType', 'payment'],
-      order: { createdAt: 'DESC' },
-    });
+  async findForUserPaginated(
+    userId: string,
+    query: ListMyTicketsQueryDto,
+  ): Promise<PaginatedResult<MyTicketListItem>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    this.logger.log(`findForUserPaginated userId=${userId} page=${page} limit=${limit}`);
+
+    const qb = this.ticketsRepository
+      .createQueryBuilder('ticket')
+      .innerJoinAndSelect('ticket.payment', 'payment')
+      .leftJoinAndSelect('ticket.ticketType', 'ticketType')
+      .where('payment.createdById = :userId', { userId })
+      .orderBy('ticket.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    if (query.status) {
+      qb.andWhere('ticket.status = :status', { status: query.status });
+    }
+
+    const [tickets, total] = await qb.getManyAndCount();
+
+    const data = await Promise.all(
+      tickets.map((t) =>
+        toMyTicketListItem(t, async (ticket) => {
+          const plain = await this.getPlainPasswordForSoldTicket(ticket);
+          return plain ?? '***';
+        }),
+      ),
+    );
+
+    return {
+      data,
+      meta: buildPaginationMeta(page, limit, total),
+    };
   }
 
   async importFromCSV(

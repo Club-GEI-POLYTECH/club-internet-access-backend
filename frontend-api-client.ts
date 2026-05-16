@@ -16,12 +16,17 @@ import type {
   User,
   Ticket,
   TicketType,
+  MyTicketListItem,
+  ListMyTicketsParams,
   PurchaseTicketRequest,
   PurchaseTicketResponse,
   ImportTypeRecommendationsResponse,
   ImportTicketsCsvResponse,
   ImportTicketsMultipartOptions,
   Payment,
+  PaymentListItem,
+  ListPaymentsParams,
+  PaginatedResponse,
   CompletePaymentRequest,
   UpdatePaymentStatusRequest,
   InitiateKelpayPaymentRequest,
@@ -158,8 +163,15 @@ export const apiClient = {
     typeById: (id: string) => apiRequest<TicketType & { availableCount: number }>(`/tickets/types/${id}`),
     available: () => apiRequest<Ticket[]>('/tickets/available'),
     byType: (typeId: string) => apiRequest<Ticket[]>(`/tickets/type/${typeId}`),
-    /** Tickets liés aux paiements de l’utilisateur connecté (JWT). */
-    mine: () => apiRequest<Ticket[]>('/tickets/me'),
+    /** Tickets de l’utilisateur connecté (JWT) — paginé `{ data, meta }`. */
+    mine: (params?: ListMyTicketsParams) => {
+      const q = new URLSearchParams();
+      if (params?.page != null) q.set('page', String(params.page));
+      if (params?.limit != null) q.set('limit', String(params.limit));
+      if (params?.status) q.set('status', params.status);
+      const qs = q.toString();
+      return apiRequest<PaginatedResponse<MyTicketListItem>>(`/tickets/me${qs ? `?${qs}` : ''}`);
+    },
     purchase: (data: PurchaseTicketRequest) =>
       apiRequest<PurchaseTicketResponse>('/tickets/purchase', { method: 'POST', body: JSON.stringify(data) }),
     /**
@@ -193,7 +205,17 @@ export const apiClient = {
   },
 
   payments: {
-    list: () => apiRequest<Payment[]>('/payments'),
+    list: (params?: ListPaymentsParams) => {
+      const q = new URLSearchParams();
+      if (params?.page != null) q.set('page', String(params.page));
+      if (params?.limit != null) q.set('limit', String(params.limit));
+      if (params?.status) q.set('status', params.status);
+      if (params?.method) q.set('method', params.method);
+      if (params?.createdById) q.set('createdById', params.createdById);
+      if (params?.search) q.set('search', params.search);
+      const qs = q.toString();
+      return apiRequest<PaginatedResponse<PaymentListItem>>(`/payments${qs ? `?${qs}` : ''}`);
+    },
     get: (id: string) => apiRequest<Payment>(`/payments/${id}`),
     complete: (id: string, data?: CompletePaymentRequest) =>
       apiRequest<Payment>(`/payments/${id}/complete`, { method: 'POST', body: JSON.stringify(data ?? {}) }),

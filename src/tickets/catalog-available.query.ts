@@ -16,7 +16,7 @@ export function andCatalogAvailableForTicket(
       `NOT EXISTS (
         SELECT 1 FROM payments p
         WHERE p."ticketId" IS NOT NULL
-        AND trim(p."ticketId") = trim(${ticketAlias}.id::text)
+        AND p."ticketId" = ${ticketAlias}.id
         AND p.method = :_kelpayMm
         AND p.status IN (:..._kelpayOpen)
       )`,

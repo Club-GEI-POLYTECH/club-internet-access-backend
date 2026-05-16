@@ -147,7 +147,7 @@ En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` 
 
 | Méthode | Chemin | Auth |
 |---------|--------|------|
-| GET | `/api/users` | JWT **admin** |
+| GET | `/api/users` | JWT **admin** | Liste **paginée** (`?page`, `?limit`, `?paymentsLimit`, `?role`, `?search`) → `{ data, meta }` |
 | GET | `/api/users/:id` | JWT **admin** |
 | POST | `/api/users` | JWT **admin** |
 | PUT | `/api/users/:id` | JWT **admin** |
@@ -157,16 +157,14 @@ En-tête JWT : `Authorization: Bearer <access_token>`. Rôles `admin` / `agent` 
 
 | Méthode | Chemin | Auth | Description |
 |---------|--------|------|-------------|
-| GET | `/api/tickets` | Non | Liste (`?status=` optionnel) |
+| GET | `/api/tickets` | JWT **admin** / **agent** | Inventaire complet (`?status=` optionnel) |
 | GET | `/api/tickets/available` | Non | Disponibles à la vente |
 | GET | `/api/tickets/types` | Non | Types + `availableCount` |
 | GET | `/api/tickets/types/:id` | Non | Détail type |
 | GET | `/api/tickets/type/:typeId` | Non | Tickets dispo par type |
 | GET | `/api/tickets/:id` | Non | Détail (`password` masqué) |
 | POST | `/api/tickets/purchase` | JWT | Réservation + paiement en attente (ex. `method: "card"` — pas d’espèces) |
-| GET | `/api/tickets/me` | JWT | Tickets achetés |
-| POST | `/api/tickets/:id/reserve` | Non | Réserver |
-| POST | `/api/tickets/:id/release` | Non | Libérer |
+| GET | `/api/tickets/me` | JWT (étudiant / tout rôle connecté) | **Mes tickets** paginés `{ data, meta }` (`?page`, `?limit`, `?status`) |
 | POST | `/api/tickets/webhook/payment` | En-tête `X-Payment-Webhook-Secret` (= `TICKETS_PAYMENT_WEBHOOK_SECRET`) | Webhook interne (mise à jour statut paiement / ticket) |
 
 ### Tickets (admin)
@@ -184,7 +182,7 @@ Alias sous **`/api/admin/tickets`** : `POST .../import`, `GET .../stats`, `DELET
 
 | Méthode | Chemin | Auth | Description |
 |---------|--------|------|-------------|
-| GET | `/api/payments` | JWT | Liste (étudiant : ses paiements) |
+| GET | `/api/payments` | JWT | Liste **paginée** `{ data, meta }` (`?page`, `?limit`, `?status`, `?method`, `?search`, `?createdById` admin/agent) |
 | GET | `/api/payments/:id` | JWT | Détail |
 | GET | `/api/payments/transaction/:transactionId` | JWT admin/agent | Par ID transaction |
 | POST | `/api/payments/:id/complete` | JWT admin/agent | Compléter |

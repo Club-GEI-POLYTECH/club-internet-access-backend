@@ -23,6 +23,49 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
+/** Paiement résumé dans `GET /users` (liste paginée, sans `providerResponse`). */
+export interface UserListPaymentItem {
+  id: string;
+  amount: number;
+  status: PaymentStatus;
+  method: PaymentMethod;
+  transactionId?: string;
+  merchantReference?: string;
+  phoneNumber?: string;
+  ticketId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserListItem extends User {
+  payments: UserListPaymentItem[];
+  /** Total de paiements du compte (hors pagination des paiements). */
+  paymentsTotal: number;
+}
+
+export interface ListUsersParams {
+  page?: number;
+  limit?: number;
+  /** Max paiements récents par utilisateur (défaut 10, max 50, 0 = aucun). */
+  paymentsLimit?: number;
+  role?: UserRole;
+  search?: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -91,6 +134,39 @@ export interface Ticket {
   paymentId?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+/** Entrée de `GET /tickets/me` (étudiant connecté, paginé). */
+export interface MyTicketPaymentSummary {
+  id: string;
+  amount: number;
+  status: PaymentStatus;
+  method: PaymentMethod;
+  createdAt: string;
+}
+
+export interface MyTicketListItem {
+  id: string;
+  username: string;
+  password: string;
+  profile: string;
+  timeLimit?: string;
+  dataLimit?: string;
+  status: TicketStatus;
+  soldAt?: string;
+  soldTo?: string;
+  ticketTypeId?: string;
+  ticketType?: Pick<TicketType, 'id' | 'name' | 'profile' | 'price' | 'timeLimit' | 'dataLimit'>;
+  paymentId?: string;
+  payment?: MyTicketPaymentSummary;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListMyTicketsParams {
+  page?: number;
+  limit?: number;
+  status?: TicketStatus;
 }
 
 export interface ImportTypeRecommendation {
@@ -163,6 +239,33 @@ export interface Payment {
   createdById?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+/** Entrée de `GET /payments` (liste paginée, sans `providerResponse`). */
+export interface PaymentListItem {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  transactionId?: string;
+  merchantReference?: string;
+  phoneNumber?: string;
+  ticketId?: string;
+  createdById?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  ticket?: Pick<Ticket, 'id' | 'username' | 'status' | 'profile'>;
+  createdBy?: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'role'>;
+}
+
+export interface ListPaymentsParams {
+  page?: number;
+  limit?: number;
+  status?: PaymentStatus;
+  method?: PaymentMethod;
+  createdById?: string;
+  search?: string;
 }
 
 /** Corps de `POST /tickets/purchase` (hors flux KELPAY `initiate` — ex. carte). */
@@ -272,11 +375,41 @@ export type DashboardUserSummary = Pick<
   'id' | 'email' | 'firstName' | 'lastName' | 'role' | 'isActive' | 'phone' | 'createdAt'
 >;
 
+export interface DashboardTicketTypeStats {
+  ticketTypeId: string;
+  name: string;
+  profile: string;
+  price: number;
+  timeLimit?: string;
+  total: number;
+  available: number;
+  sold: number;
+  reserved: number;
+  revenue: number;
+}
+
+export interface DashboardRecentTicketSummary {
+  id: string;
+  username: string;
+  profile: string;
+  status: TicketStatus;
+  timeLimit?: string;
+  soldAt?: string;
+  soldTo?: string;
+  ticketTypeId?: string;
+  ticketType?: Pick<TicketType, 'id' | 'name' | 'profile' | 'price' | 'timeLimit'>;
+  createdAt: string;
+}
+
 export interface DashboardStats {
   payments: {
     total: number;
+    /** Payés (statuts `success` + `completed`). */
     completed: number;
+    /** `pending` uniquement (sans `processing`). */
     pending: number;
+    processing: number;
+    cancelled: number;
     failed: number;
     revenue: number;
   };
@@ -286,6 +419,7 @@ export interface DashboardStats {
     sold: number;
     reserved: number;
     revenue: number;
+    byTicketType: DashboardTicketTypeStats[];
   };
   users: {
     total: number;
@@ -300,6 +434,7 @@ export interface DashboardStats {
   recent: {
     payments: Payment[];
     users: DashboardUserSummary[];
+    tickets: DashboardRecentTicketSummary[];
   };
 }
 
